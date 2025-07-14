@@ -11,6 +11,7 @@ sqlalchemy = "*"
 sqlalchemy-serializer = "*"
 werkzeug = "*"
 python-dotenv = "*"
+flask-jwt-extended = "*"
 
 [dev-packages]
 
