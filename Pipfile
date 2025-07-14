@@ -8,10 +8,10 @@ flask-restful = "*"
 flask-migrate = "*"
 flask = "*"
 sqlalchemy = "*"
-sqlalchemy-serializer = "*"
 werkzeug = "*"
 python-dotenv = "*"
 flask-jwt-extended = "*"
+sqlalchemy-serializer = "*"
 
 [dev-packages]
 
