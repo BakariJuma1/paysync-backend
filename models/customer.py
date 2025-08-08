@@ -11,6 +11,9 @@ class Customer(db.Model,SerializerMixin):
     id_number = db.Column(db.String,nullable=False)
     created_at = db.Column(db.DateTime,default=datetime.utcnow)
     updated_at = db.Column(db.DateTime,default=datetime.utcnow(),onupdate=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+
+
 
     # relations
     debts = db.relationship("Debt",back_populates='customer',cascade="all,delete,passive_deletes=True")
