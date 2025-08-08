@@ -3,3 +3,5 @@ from .changelog import Changelog
 from .customer import Customer
 from .item import Item
 from .payment import Payment
+from .user import User
+from .business import Business

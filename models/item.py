@@ -10,4 +10,4 @@ class Item(db.Model,SerializerMixin):
     price = db.Column(db.Float,nullable=False)
     category = db.Column(db.String,nullable=False)
     quantity = db.Column(db.Integer,nullable=False)
-    total_price = db.C
+    total_price = db.Column(db.Float,nullable=False)
