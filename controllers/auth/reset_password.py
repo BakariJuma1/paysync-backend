@@ -1,5 +1,5 @@
 from flask_restful import Resource,Api
-from flask import request,Blueprint
+from flask import request
 from werkzeug.security import generate_password_hash
 from server.models import User
 from datetime import datetime

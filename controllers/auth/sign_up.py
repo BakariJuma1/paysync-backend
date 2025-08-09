@@ -2,10 +2,7 @@ from flask import Blueprint, request
 from flask_restful import Api, Resource
 from server.models import User
 from server.extension import db
-from werkzeug.security import generate_password_hash
-import uuid
-from server.service.email_service import send_verification_email  # your existing email function
-from datetime import datetime
+from server.service.email_service import send_verification_email  
 from . import auth_bp
 
 
@@ -19,7 +16,7 @@ class OwnerSignup(Resource):
         if User.query.filter_by(email=data['email']).first():
             return {"message": "User with this email already exists"}, 400
 
-        verification_token = str(uuid.uuid4())
+        
         user = User(
             name=data['name'],
             email=data['email'],

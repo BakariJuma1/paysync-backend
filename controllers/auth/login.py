@@ -1,7 +1,6 @@
 from flask_restful import Resource,Api
 from flask import request
 from server.models import User
-from server.extension import db
 from flask_jwt_extended import create_access_token
 from datetime import timedelta
 from . import auth_bp

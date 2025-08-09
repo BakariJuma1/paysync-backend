@@ -1,5 +1,5 @@
 from flask_restful import Resource,Api
-from flask import request,Blueprint
+from flask import request
 import secrets
 from datetime import datetime, timedelta
 from server.models import User
