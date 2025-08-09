@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask
 from flask_cors import CORS
-from flask_restful import Api, Resource
+from flask_restful import Api
 from dotenv import load_dotenv
 from server.extension import db,migrate,jwt
+from server.routes_controller import register_routes
 
 load_dotenv()
 
@@ -20,7 +21,7 @@ def create_app():
     api=Api(app)
     jwt.init_app(app)
 
-
+    register_routes(app)
     @app.route('/')
     def home():
         return {"message":"Welcome to paysync API"}
