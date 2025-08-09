@@ -19,8 +19,6 @@ def send_verification_email(user):
     code = ''.join(secrets.choice('0123456789') for _ in range(6))  # 6-digit code
 
     user.verification_token = token
-    user.verification_code = code
-
     user.verification_token_expiry = datetime.utcnow() + timedelta(minutes=10)
     db.session.commit()
 
@@ -32,7 +30,7 @@ def send_verification_email(user):
     # Recipient
     to = [{
         "email": user.email,
-        "name": user.full_name
+        "name": user.name
     }]
 
     subject = "Verify your email"

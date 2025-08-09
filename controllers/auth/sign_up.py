@@ -24,15 +24,14 @@ class OwnerSignup(Resource):
             name=data['name'],
             email=data['email'],
             role='owner',
-            is_verified=False,
-            verification_token=verification_token
+            is_verified=False
         )
         user.set_password(data['password'])
 
         db.session.add(user)
         db.session.commit()
 
-        send_verification_email(user.email, user.name, verification_token)
+        send_verification_email(user)
         return {"message": "Owner registered! Please verify your email."}, 201
 
 api.add_resource(OwnerSignup, '/register')

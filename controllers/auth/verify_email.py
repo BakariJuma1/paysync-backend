@@ -1,9 +1,7 @@
-from flask import Blueprint, request
+from flask import request
 from flask_restful import Api, Resource
 from server.models import User
 from server.extension import db
-from werkzeug.security import generate_password_hash
-from server.service.email_service import send_verification_email  # your existing email function
 from datetime import datetime
 from . import auth_bp
 
