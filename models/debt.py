@@ -1,5 +1,5 @@
 from datetime import datetime
-from extension import db
+from server.extension import db
 from sqlalchemy_serializer import SerializerMixin
 
 class Debt(db.Model, SerializerMixin):

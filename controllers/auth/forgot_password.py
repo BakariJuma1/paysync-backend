@@ -2,7 +2,8 @@ from flask_restful import Resource,Api
 from flask import request,Blueprint
 import secrets
 from datetime import datetime, timedelta
-from server.models import User, db
+from server.models import User
+from server.extension import db
 from server.service.password_reset import send_password_reset_email
 from . import auth_bp
 

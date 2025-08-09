@@ -1,8 +1,9 @@
 from flask_restful import Resource,Api
 from flask import request,Blueprint
 from werkzeug.security import generate_password_hash
-from server.models import User, db
+from server.models import User
 from datetime import datetime
+from server.extension import db
 from . import auth_bp
 
 

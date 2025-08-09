@@ -1,4 +1,4 @@
-from extension import db
+from server.extension import db
 from sqlalchemy_serializer import SerializerMixin
 
 class Item(db.Model, SerializerMixin):
