@@ -12,6 +12,12 @@ class User(db.Model, SerializerMixin):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), default="salesperson")  # owner, admin, salesperson
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    verification_token = db.Column(db.String(128), unique=True, nullable=True)
+    verification_token_expiry = db.Column(db.DateTime, nullable=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    reset_token = db.Column(db.String(128), unique=True, nullable=True)
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)
+
 
     serialize_rules = ('-debts.created_by_user', '-payments.received_by_user', '-changelogs.changed_by_user', '-businesses.owner')
 
