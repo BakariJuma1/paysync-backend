@@ -38,16 +38,20 @@ def send_verification_email(user):
     <html>
     <body>
         <h1>Email Verification</h1>
-        <p>Hello {user.full_name},</p>
+        <p>Hello {user.name},</p>
         <p>Please verify your email using this 6-digit code:</p>
         <h2 style="font-size: 24px; letter-spacing: 3px; margin: 20px 0;">
             {code}
         </h2>
         <p>This code expires in 10 minutes.</p>
         <p>Alternatively, you can click this link to verify:</p>
-        <a href="http://localhost:5173/?token={token}">
+        <a href="http://localhost:5173/verify-email?token={token}">
             Verify Email
         </a>
+        <p>If you did not request this, please ignore this email.</p>
+        <p>Thank you!</p>
+        <p>Best regards,<br>PaySync Team</p>
+        <p><small>This is an automated message, please do not reply.</small></p>
     </body>
     </html>
     """

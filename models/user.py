@@ -17,6 +17,8 @@ class User(db.Model, SerializerMixin):
     is_verified = db.Column(db.Boolean, default=False)
     reset_token = db.Column(db.String(128), unique=True, nullable=True)
     reset_token_expiry = db.Column(db.DateTime, nullable=True)
+    last_verification_email_sent = db.Column(db.DateTime, nullable=True)
+
 
 
     serialize_rules = ('-debts.created_by_user', '-payments.received_by_user', '-changelogs.changed_by_user', '-businesses.owner')
