@@ -4,6 +4,7 @@ from server.models import User
 from server.extension import db
 from server.service.email_service import send_verification_email  
 from . import auth_bp
+import pyotp
 
 
 api = Api(auth_bp)
@@ -24,11 +25,17 @@ class OwnerSignup(Resource):
             is_verified=False
         )
         user.set_password(data['password'])
+         
+        secret = pyotp.random_base32()
+        user.verification_secret = secret
 
         db.session.add(user)
         db.session.commit()
 
-        send_verification_email(user)
+        totp = pyotp.TOTP(secret)
+        otp_code = totp.now()
+       
+        send_verification_email(user,otp_code)
         return {"message": "Owner registered! Please verify your email."}, 201
 
 api.add_resource(OwnerSignup, '/register')

@@ -1,39 +1,34 @@
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
 import os
-import secrets
-from server.extension import db
-from datetime import datetime, timedelta, timezone
 import logging
 
 logger = logging.getLogger(__name__)
 
-def send_verification_email(user):
+def send_verification_email(user, otp_code):
+    """
+    Send a verification email with the given OTP code to the user.
+    
+    :param user: User model instance
+    :param otp_code: str, 6-digit OTP code generated externally (e.g. via pyotp)
+    """
     configuration = sib_api_v3_sdk.Configuration()
     configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
 
     api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
-    # Generate token and set expiry
-    token = secrets.token_urlsafe(32)
-    code = ''.join(secrets.choice('0123456789') for _ in range(6))  # 6-digit code
-
-    user.verification_token = token
-    user.verification_token_expiry = datetime.utcnow() + timedelta(minutes=10)
-    db.session.commit()
-
     sender = {
-        "email": os.getenv("MAIL_DEFAULT_SENDER"), 
+        "email": os.getenv("MAIL_DEFAULT_SENDER"),
         "name": "PaySync"
     }
 
-    # Recipient
     to = [{
         "email": user.email,
         "name": user.name
     }]
 
     subject = "Verify your email"
+
     html_content = f"""
     <html>
     <body>
@@ -41,13 +36,9 @@ def send_verification_email(user):
         <p>Hello {user.name},</p>
         <p>Please verify your email using this 6-digit code:</p>
         <h2 style="font-size: 24px; letter-spacing: 3px; margin: 20px 0;">
-            {code}
+            {otp_code}
         </h2>
-        <p>This code expires in 10 minutes.</p>
-        <p>Alternatively, you can click this link to verify:</p>
-        <a href="http://localhost:5173/verify-email?token={token}">
-            Verify Email
-        </a>
+        <p>This code is valid for 30 seconds.</p>
         <p>If you did not request this, please ignore this email.</p>
         <p>Thank you!</p>
         <p>Best regards,<br>PaySync Team</p>
@@ -56,7 +47,6 @@ def send_verification_email(user):
     </html>
     """
 
-    # Build email payload
     send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
         to=to,
         sender=sender,
@@ -64,7 +54,6 @@ def send_verification_email(user):
         html_content=html_content
     )
 
-    
     try:
         response = api_instance.send_transac_email(send_smtp_email)
         logger.info(f"Verification email sent to {user.email}. Response: {response}")

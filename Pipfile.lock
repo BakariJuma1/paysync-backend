@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "787fa283689101018e867caeaaa173ad2ab2e326b2373e5d7e085acadb94a7c4"
+            "sha256": "bdbb0a78fa3890376119f0cc327bcee27d16a2b05ed5a92b4cfa38a8a36a7faa"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -175,6 +175,15 @@
             ],
             "index": "pypi",
             "version": "==1.0.1"
+        },
+        "faker": {
+            "hashes": [
+                "sha256:0a79ebe8f0ea803f7bd288d51e2d445b86035a2480e048daee1bffbd4d69b32b",
+                "sha256:94216ce3d8affdc0a8fd0ea8219c184c346a1dcf07b03f193e52f3116186621e"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.8'",
+            "version": "==35.2.2"
         },
         "filelock": {
             "hashes": [
@@ -566,6 +575,15 @@
             "markers": "python_version >= '3.8'",
             "version": "==2.9.0"
         },
+        "pyotp": {
+            "hashes": [
+                "sha256:346b6642e0dbdde3b4ff5a930b664ca82abfa116356ed48cc42c7d6590d36f63",
+                "sha256:81c2e5865b8ac55e825b0358e496e1d9387c811e85bb40e71a3b29b288963612"
+            ],
+            "index": "pypi",
+            "markers": "python_version >= '3.7'",
+            "version": "==2.9.0"
+        },
         "pysocks": {
             "hashes": [
                 "sha256:08e69f092cc6dbe92a0fdd16eeb9b9ffbc13cadfe5ca4c7bd92ffb078b293299",
@@ -574,6 +592,14 @@
             ],
             "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
             "version": "==1.7.1"
+        },
+        "python-dateutil": {
+            "hashes": [
+                "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3",
+                "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"
+            ],
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2'",
+            "version": "==2.9.0.post0"
         },
         "python-dotenv": {
             "hashes": [

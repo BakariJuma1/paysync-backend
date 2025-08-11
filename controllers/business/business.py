@@ -1,15 +1,30 @@
 from flask_restful import Resource, Api
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy.exc import SQLAlchemyError
 from server.models import Business, User
 from server.extension import db
-from datetime import datetime
 from . import business_bp
 
 api = Api(business_bp)
 
-class BusinessResource(Resource):
+@business_bp.route('/business/my', methods=['GET'])
+@jwt_required()
+def get_my_business():
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(current_user_id)
+    
+    if current_user.role == 'owner':
+        business = Business.query.filter_by(owner_id=current_user_id).first()
+    else:
+        business = Business.query.get(current_user.business_id) if current_user.business_id else None
+        
+    if not business:
+        return jsonify({"message": "No business found"}), 404
+    return jsonify(business.to_dict()), 200
 
+
+class BusinessResource(Resource):
     @jwt_required()
     def get(self, business_id=None):
         current_user_id = get_jwt_identity()
@@ -17,96 +32,103 @@ class BusinessResource(Resource):
 
         if business_id:
             business = Business.query.get_or_404(business_id)
+            
+            # Permission checks
+            if current_user.role == 'salesperson' and business.id != current_user.business_id:
+                return {"message": "Access denied"}, 403
+            if current_user.role == 'admin' and business.owner_id != current_user_id and business.id != current_user.business_id:
+                return {"message": "Access denied"}, 403
+                
+            return business.to_dict(), 200
 
-            # Salesman may only view businesses they belong to? Or all?
-            # Adjust this logic as needed
-            if current_user.role == 'salesman':
-                # Example: restrict salesman to only businesses where owner is current_user?
-                if business.owner_id != current_user_id:
-                    return jsonify({"message": "Access denied"}), 403
-
-            return jsonify(business.to_dict()), 200
-
-        # List all businesses — filter by role
+        # List businesses based on role
         if current_user.role == 'owner':
-            # Owners see only their businesses
-            businesses = Business.query.filter_by(owner_id=current_user_id).all()
+            return [b.to_dict() for b in current_user.owned_businesses], 200
         elif current_user.role == 'admin':
-            # Admin sees all businesses
-            businesses = Business.query.all()
-        else:
-            # Salesman might see only businesses they belong to or empty list
-            businesses = Business.query.filter_by(owner_id=current_user_id).all()
-
-        return jsonify([b.to_dict() for b in businesses]), 200
+            return [b.to_dict() for b in Business.query.all()], 200
+        elif current_user.business_id:
+            return [Business.query.get(current_user.business_id).to_dict()], 200
+        return [], 200
 
     @jwt_required()
     def post(self):
         current_user_id = get_jwt_identity()
         current_user = User.query.get(current_user_id)
 
-        # Only owners or admins can create businesses
-        if current_user.role not in ['owner', 'admin']:
-            return jsonify({"message": "Access denied"}), 403
+        # STRICT OWNER-ONLY CREATION
+        if current_user.role != 'owner':
+            return {"message": "Only owners can create businesses"}, 403
 
         data = request.get_json() or {}
+        
+        # Validation
+        required_fields = ['name', 'address', 'phone', 'email']
+        if any(field not in data or not data[field].strip() for field in required_fields):
+            return {"message": "All fields are required: name, address, phone, email"}, 400
 
-        name = data.get('name')
-        if not name:
-            return jsonify({"message": "Business name is required"}), 400
+        try:
+            business = Business(
+                name=data['name'].strip(),
+                owner_id=current_user_id,  # Always set owner to current user
+                address=data['address'].strip(),
+                phone=data['phone'].strip(),
+                email=data['email'].strip(),
+                website=data.get('website', '').strip(),
+                description=data.get('description', '').strip()
+            )
 
-        contact_info = data.get('contact_info')
+            db.session.add(business)
+            db.session.commit()
+            
+            return {
+                "business": business.to_dict(),
+                "message": "Business created successfully"
+            }, 201
 
-        business = Business(
-            name=name,
-            owner_id=current_user_id if current_user.role == 'owner' else data.get('owner_id', current_user_id),
-            contact_info=contact_info
-        )
-
-        db.session.add(business)
-        db.session.commit()
-
-        return jsonify(business.to_dict()), 201
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"message": "Database error", "details": str(e)}, 422
 
     @jwt_required()
     def put(self, business_id):
         current_user_id = get_jwt_identity()
         current_user = User.query.get(current_user_id)
-
         business = Business.query.get_or_404(business_id)
 
-        # Only owner of business or admin can update
-        if current_user.role not in ['owner', 'admin'] or (current_user.role == 'owner' and business.owner_id != current_user_id):
-            return jsonify({"message": "Access denied"}), 403
+        # OWNER-ONLY MODIFICATION
+        if current_user.role != 'owner' or business.owner_id != current_user_id:
+            return {"message": "Only the business owner can modify this business"}, 403
 
         data = request.get_json() or {}
+        updatable_fields = ['name', 'address', 'phone', 'email', 'website', 'description']
 
-        if 'name' in data:
-            business.name = data['name']
+        for field in updatable_fields:
+            if field in data and data[field]:
+                setattr(business, field, data[field].strip())
 
-        if 'contact_info' in data:
-            business.contact_info = data['contact_info']
-
-        db.session.commit()
-
-        return jsonify(business.to_dict()), 200
+        try:
+            db.session.commit()
+            return business.to_dict(), 200
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"message": "Database error", "details": str(e)}, 422
 
     @jwt_required()
     def delete(self, business_id):
         current_user_id = get_jwt_identity()
         current_user = User.query.get(current_user_id)
-
         business = Business.query.get_or_404(business_id)
 
-        # Only owner of business or admin can delete
-        if current_user.role not in ['owner', 'admin'] or (current_user.role == 'owner' and business.owner_id != current_user_id):
-            return jsonify({"message": "Access denied"}), 403
+        # OWNER-ONLY DELETION
+        if current_user.role != 'owner' or business.owner_id != current_user_id:
+            return {"message": "Only the business owner can delete this business"}, 403
 
-        db.session.delete(business)
-        db.session.commit()
+        try:
+            db.session.delete(business)
+            db.session.commit()
+            return {"message": "Business deleted successfully"}, 200
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"message": "Database error", "details": str(e)}, 422
 
-        return jsonify({"message": f"Business {business_id} deleted"}), 200
-
-
-# Register resource routes
 api.add_resource(BusinessResource, '/businesses', '/businesses/<int:business_id>')

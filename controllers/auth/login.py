@@ -1,13 +1,12 @@
-from flask_restful import Resource,Api
+from flask_restful import Resource, Api
 from flask import request
-from server.models import User
+from server.models import User, Business
 from flask_jwt_extended import create_access_token
 from datetime import timedelta
 from . import auth_bp
 
-
-
 api = Api(auth_bp)
+
 class Login(Resource):
     def post(self):
         data = request.get_json()
@@ -24,12 +23,36 @@ class Login(Resource):
         if not user.is_verified:
             return {"message": "Email not verified. Please verify before logging in."}, 403
 
-        access_token = create_access_token(identity=user.id, expires_delta=timedelta(hours=1))
-        
-        # Check if business info exists (for owners)
-        business = None
+        # Get all relevant business data in one query
+        business_data = None
         if user.role == "owner":
-            business = user.businesses[0] if user.businesses else None
+            business = Business.query.filter_by(owner_id=user.id).first()
+            if business:
+                business_data = {
+                    "id": business.id,
+                    "name": business.name,
+                    "address": business.address,
+                    "phone": business.phone,
+                    "email": business.email,
+                    "website": business.website,
+                    "description": business.description
+                }
+        elif user.business_id:  # For non-owner roles
+            business = Business.query.get(user.business_id)
+            if business:
+                business_data = {
+                    "id": business.id,
+                    "name": business.name
+                }
+
+        access_token = create_access_token(
+            identity=user.id,
+            expires_delta=timedelta(hours=1),
+            additional_claims={
+                "role": user.role,
+                "business_id": business.id if business else None
+            }
+        )
 
         return {
             "access_token": access_token,
@@ -38,8 +61,10 @@ class Login(Resource):
                 "name": user.name,
                 "email": user.email,
                 "role": user.role,
+                "business_id": user.business_id
             },
-            "business_complete": bool(business and business.name)
+            "business": business_data,
+            "has_business": bool(business_data)
         }, 200
 
 api.add_resource(Login, '/login')
