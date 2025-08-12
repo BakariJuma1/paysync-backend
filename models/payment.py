@@ -12,7 +12,14 @@ class Payment(db.Model, SerializerMixin):
     method = db.Column(db.String(50))  # cash, mobile money, bank
     received_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
-    serialize_rules = ('-debt.payments', '-received_by_user.payments')
+    serialize_rules = (
+        '-debt.payments',
+        '-received_by_user.payments',
+        # Add these to prevent deeper recursion
+        '-debt.customer',
+        '-debt.created_by_user',
+        '-received_by_user.debts',
+    )
 
     # Relationships
     debt = db.relationship("Debt", back_populates="payments")

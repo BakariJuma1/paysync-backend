@@ -57,7 +57,9 @@ class InvitationResource(Resource):
         db.session.commit()
 
         # Send email
-        invite_url = f"{os.getenv('FRONTEND_URL')}/accept-invite?token={token}"
+        frontend_url = os.getenv('FRONTEND_URL', '').rstrip('/')
+        invite_url = f"{frontend_url}/accept-invite?token={token}"
+
         email_sent = send_invitation_email(
             user_email=data["email"],
             user_name=data["name"],
@@ -173,7 +175,10 @@ class InvitationActions(Resource):
         db.session.commit()
 
         business = Business.query.get(invitation.business_id)
-        invite_url = f"{os.getenv('FRONTEND_URL')}/accept-invite?token={invitation.token}"
+
+        frontend_url = os.getenv('FRONTEND_URL', '').rstrip('/')
+        invite_url = f"{frontend_url}/accept-invite?token={invitation.token}" 
+       
 
         email_sent = send_invitation_email(
             user_email=invitation.email,

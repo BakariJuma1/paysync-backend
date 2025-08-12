@@ -14,10 +14,13 @@ class Invitation(db.Model, SerializerMixin):
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    
     serialize_rules = (
         '-business.invitations',
-        '-creator.sent_invitations'
+        '-creator.sent_invitations',
+        # Add these to prevent deeper recursion
+        '-business.owner',
+        '-business.members',
     )
 
     # Relationships

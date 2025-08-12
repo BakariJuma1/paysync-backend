@@ -14,8 +14,13 @@ class Customer(db.Model, SerializerMixin):
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     business_id = db.Column(db.Integer, db.ForeignKey("businesses.id"), nullable=False)
 
-    serialize_rules = ('-debts.customer', '-business.customers')
-
+    serialize_rules = (
+        '-debts.customer',
+        '-business.customers',
+        # Add these to prevent deeper recursion
+        '-business.members',
+        '-business.owner',
+    )
     # Relationships
     debts = db.relationship("Debt", back_populates='customer', cascade="all, delete-orphan")
     business = db.relationship("Business", back_populates="customers")

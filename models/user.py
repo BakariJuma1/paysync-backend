@@ -30,15 +30,19 @@ class User(db.Model, SerializerMixin):
         foreign_keys="Business.owner_id",
         back_populates="owner"
     )
-
     serialize_rules = (
-        '-owned_businesses.owner',   
-        '-businesses.owner', 
-        '-debts.created_by_user',
-        '-payments.received_by_user',
-        '-changelogs.changed_by_user',
-        '-businesses.owner'
+        '-password_hash',
+        '-verification_token',
+        '-reset_token',
+        '-verification_secret',
+        '-owned_businesses',  # Completely exclude owned_businesses
+        '-businesses',        # Completely exclude businesses
+        '-debts',            # Completely exclude debts
+        '-payments',
+        '-changelogs',
+        '-sent_invitations',
     )
+  
 
     # Relationships
     debts = db.relationship("Debt", back_populates="created_by_user")

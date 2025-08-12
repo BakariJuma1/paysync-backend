@@ -16,13 +16,22 @@ class Debt(db.Model, SerializerMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    serialize_rules = ('-customer.debts', '-items.debt', '-payments.debt', '-created_by_user.debts')
-
+    
     # Relationships
     customer = db.relationship("Customer", back_populates="debts")
     created_by_user = db.relationship("User", back_populates="debts")
     items = db.relationship("Item", back_populates="debt", cascade="all, delete-orphan")
     payments = db.relationship("Payment", back_populates="debt", cascade="all, delete-orphan")
+
+    serialize_rules = (
+        '-customer.debts',
+        '-items.debt',
+        '-payments.debt',
+        '-created_by_user.debts',
+        # Add these to prevent deeper recursion
+        '-created_by_user.payments',
+        '-created_by_user.changelogs',
+    )
 
     def calculate_total(self):
         self.total = sum(item.total_price for item in self.items)

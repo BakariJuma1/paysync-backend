@@ -16,12 +16,22 @@ class Business(db.Model, SerializerMixin):
     website = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    
     serialize_rules = (
         '-owner.businesses',
-        '-members.business_membership'
-
-        )
+        '-owner.owned_businesses',
+        '-members.business_membership',
+        '-customers.business',
+        '-invitations.business',
+        # Prevent business -> members -> business recursion
+        '-members.owned_businesses',
+        '-members.businesses',
+        '-members.debts',
+        '-members.payments',
+        '-owner',         
+        '-members.debts', 
+        '-customers.debts'
+    )
 
     # Relationships
     owner = db.relationship(

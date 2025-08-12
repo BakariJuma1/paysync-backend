@@ -11,7 +11,11 @@ class Item(db.Model, SerializerMixin):
     category = db.Column(db.String, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
 
-    serialize_rules = ('-debt.items',)
+    serialize_rules = (
+        '-debt.items',
+        # Add this to prevent deeper recursion
+        '-debt.customer',
+    )
 
     # Relationship
     debt = db.relationship("Debt", back_populates="items")

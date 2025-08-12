@@ -13,7 +13,14 @@ class ChangeLog(db.Model, SerializerMixin):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     details = db.Column(db.JSON)
 
-    serialize_rules = ('-changed_by_user.changelogs',)
+    serialize_rules = (
+        '-changed_by_user.changelogs',
+        '-changed_by_user.debts',
+        '-changed_by_user.payments',
+        '-changed_by_user.owned_businesses',
+        '-changed_by_user.businesses',
+        '-changed_by_user.sent_invitations',
+    )
 
     # Relationships
     changed_by_user = db.relationship("User", back_populates="changelogs")
