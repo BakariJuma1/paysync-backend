@@ -45,6 +45,8 @@ class User(db.Model, SerializerMixin):
     payments = db.relationship("Payment", back_populates="received_by_user")
     changelogs = db.relationship("ChangeLog", back_populates="changed_by_user")
     businesses = db.relationship("Business", back_populates="owner", foreign_keys=[business_id])
+    sent_invitations = db.relationship("Invitation", back_populates="creator", cascade="all, delete-orphan")
+
 
 
     def set_password(self, password):

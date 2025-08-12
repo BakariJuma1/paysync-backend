@@ -6,3 +6,4 @@ from .payment import Payment
 from .user import User
 from .business import Business
 from .debt import Debt 
+from .invitations import Invitation
