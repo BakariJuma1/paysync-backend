@@ -46,10 +46,7 @@ class OwnerBusinessSettings(Resource):
 
         db.session.commit()
         return {"message": "Business updated successfully"}
-
-
-
-# TEAM MANAGEMENT
+    
 
 class OwnerUserManagement(Resource):
     @role_required("owner")
