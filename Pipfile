@@ -17,6 +17,7 @@ flask-migrate = "*"
 flask-cors = "*"
 pyotp = "*"
 faker = "*"
+celery = "*"
 
 [dev-packages]
 

@@ -7,3 +7,4 @@ from .user import User
 from .business import Business
 from .debt import Debt 
 from .invitations import Invitation
+from .finance_settings import FinanceSettings
