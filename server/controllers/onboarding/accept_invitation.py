@@ -58,6 +58,7 @@ class AcceptInvite(Resource):
                 "name": new_user.name,
                 "email": new_user.email,
                 "role": new_user.role,
+                "is_verified": True,
                 "business_id": new_user.business_id,
             }
         }, 201
