@@ -2,9 +2,8 @@ services:
   - type: web
     name: paysync-backend
     env: python
-    rootDir: .
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand:PYTHONPATH=. flask --app server.app db upgrade && gunicorn server.wsgi:app
-    plan: free
-    envVars:
-      - fromGroup: paysync-env
+    buildCommand: pip install -r requirements.txt
+    startCommand: |
+      cd ..
+      PYTHONPATH=. flask --app server.app db upgrade && gunicorn server.wsgi:app
+    rootDir: server
