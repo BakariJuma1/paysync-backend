@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: paysync-backend
+    env: python
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash -c "flask db upgrade && gunicorn wsgi:app"
+    plan: free
+    envVars:
+      - fromGroup: paysync-env
+
