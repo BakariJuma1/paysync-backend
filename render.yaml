@@ -8,4 +8,5 @@ services:
     plan: free
     envVars:
       - fromGroup: paysync-env
-
+      - key: PYTHONPATH
+        value: .
