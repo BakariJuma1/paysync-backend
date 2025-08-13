@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask,jsonify
 from flask_cors import CORS
 from flask_restful import Api
 from dotenv import load_dotenv
@@ -6,6 +6,7 @@ from server.extension import db, migrate, jwt
 from server.routes_controller import register_routes
 import os
 from datetime import timedelta
+import logging
 
 load_dotenv()
 
@@ -44,6 +45,14 @@ def create_app():
 
     # Register routes
     register_routes(app)
+
+    
+ 
+    @app.errorhandler(Exception)
+    def handle_error(e):
+        app.logger.error(f"Unhandled error: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
     
     @app.route('/')
     def home():
