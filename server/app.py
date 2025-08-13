@@ -36,6 +36,9 @@ def create_app():
     
     # Database Configuration
     app.config.from_prefixed_env()
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        "pool_pre_ping": True
+    }
     
     # Initialize extensions
     db.init_app(app)
