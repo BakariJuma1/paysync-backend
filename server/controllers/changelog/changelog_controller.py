@@ -1,7 +1,7 @@
 import logging
 from flask_restful import Resource, Api
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import ChangeLog, User
+from server.models import ChangeLog, User
 from server.extension import db
 from . import changelog_bp
 

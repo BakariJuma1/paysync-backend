@@ -6,7 +6,7 @@ from server.controllers.dashboard import dashboard_bp
 from server.controllers.settings import settings_bp
 from server.controllers.onboarding import onboarding_bp
 from server.controllers.finance import finance_bp
-
+from server.controllers.changelog import changelog_bp
 
 
 def register_routes(app):
@@ -18,3 +18,4 @@ def register_routes(app):
     app.register_blueprint(settings_bp)
     app.register_blueprint(onboarding_bp)
     app.register_blueprint(finance_bp)
+    app.register_blueprint(changelog_bp)
