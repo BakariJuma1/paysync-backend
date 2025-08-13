@@ -6,12 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def send_verification_email(user, otp_code):
-    """
-    Send a verification email with the given OTP code to the user.
     
-    :param user: User model instance
-    :param otp_code: str, 6-digit OTP code generated externally (e.g. via pyotp)
-    """
     configuration = sib_api_v3_sdk.Configuration()
     configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
 
@@ -26,6 +21,9 @@ def send_verification_email(user, otp_code):
         "email": user.email,
         "name": user.name
     }]
+    print(f"[DEBUG] About to send email to: {user.email!r}, name: {user.name!r}")
+    logger.info(f"[DEBUG] About to send email to: {user.email!r}, name: {user.name!r}")
+
 
     subject = "Verify your email"
 
