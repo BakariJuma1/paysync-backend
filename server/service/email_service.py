@@ -36,7 +36,7 @@ def send_verification_email(user, otp_code):
         <h2 style="font-size: 24px; letter-spacing: 3px; margin: 20px 0;">
             {otp_code}
         </h2>
-        <p>This code is valid for 30 seconds.</p>
+        <p>This code is valid for 4 minutes.</p>
         <p>If you did not request this, please ignore this email.</p>
         <p>Thank you!</p>
         <p>Best regards,<br>PaySync Team</p>
