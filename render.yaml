@@ -4,7 +4,7 @@ services:
     env: python
     rootDir: .
     buildCommand: pip install -r requirements.txt
-    startCommand: bash -c "flask db upgrade && gunicorn wsgi:app"
+    startCommand:  bash -c "PYTHONPATH=. flask --app server.app db upgrade && gunicorn server.wsgi:app"
     plan: free
     envVars:
       - fromGroup: paysync-env
