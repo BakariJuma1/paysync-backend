@@ -36,7 +36,7 @@ class AcceptInvite(Resource):
             email=invitation.email,
             password_hash=hashed_password,
             role=invitation.role,
-            verified=True,
+            is_verified=True,
             business_id=invitation.business_id,
             created_at=datetime.utcnow()
         )
