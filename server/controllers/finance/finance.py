@@ -1,4 +1,4 @@
-# routes/finance.py
+from flask import request  
 from flask_restful import Resource, Api
 from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business, FinanceSettings, ChangeLog
@@ -8,6 +8,7 @@ from datetime import datetime
 from . import finance_bp
 
 api = Api(finance_bp)
+
 
 class FinanceSettingsResource(Resource):
     @role_required(["owner", "admin"])
@@ -23,14 +24,47 @@ class FinanceSettingsResource(Resource):
                 User.query.filter_by(id=current_user_id, business_id=business_id).first()):
             return {"message": "Unauthorized access to business"}, 403
 
+        # Get or create settings
         settings = FinanceSettings.query.filter_by(business_id=business_id).first()
         if not settings:
-            # Create default settings if they don't exist
-            settings = FinanceSettings(business_id=business_id)
-            db.session.add(settings)
-            db.session.commit()
-        
-        return settings.to_dict()
+            try:
+                settings = FinanceSettings(
+                    business_id=business_id,
+                    default_currency='USD',
+                    payment_due_day=1,
+                    grace_period_days=5,
+                    late_fee_type='percentage',
+                    late_fee_value=5,
+                    late_fee_recurring=False,
+                    reminder_before_due=True,
+                    reminder_before_days=3,
+                    reminder_after_due=True,
+                    reminder_after_days=1
+                )
+                db.session.add(settings)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return {"message": "Failed to create default settings", "error": str(e)}, 500
+
+        # Ensure we're returning a serializable dictionary
+        if hasattr(settings, 'to_dict'):
+            return settings.to_dict(), 200
+        else:
+            # Manual serialization if to_dict() doesn't exist
+            return {
+                "business_id": settings.business_id,
+                "default_currency": settings.default_currency,
+                "payment_due_day": settings.payment_due_day,
+                "grace_period_days": settings.grace_period_days,
+                "late_fee_type": settings.late_fee_type,
+                "late_fee_value": settings.late_fee_value,
+                "late_fee_recurring": settings.late_fee_recurring,
+                "reminder_before_due": settings.reminder_before_due,
+                "reminder_before_days": settings.reminder_before_days,
+                "reminder_after_due": settings.reminder_after_due,
+                "reminder_after_days": settings.reminder_after_days
+            }, 200
 
     @role_required(["owner", "admin"])
     def put(self, business_id):
@@ -45,53 +79,60 @@ class FinanceSettingsResource(Resource):
                 User.query.filter_by(id=current_user_id, business_id=business_id).first()):
             return {"message": "Unauthorized access to business"}, 403
 
-        data, error, status = parse_json(
-            optional_fields=[
-                "default_currency",
-                "payment_due_day", "grace_period_days",
-                "late_fee_type", "late_fee_value", "late_fee_max", "late_fee_recurring",
-                "interest_enabled", "interest_rate", "interest_compounding",
-                "reminder_before_due", "reminder_before_days",
-                "reminder_after_due", "reminder_after_days",
-                "reminder_method"
+        try:
+            data = request.get_json()
+            if not data:
+                return {"message": "No data provided"}, 400
+
+            settings = FinanceSettings.query.filter_by(business_id=business_id).first()
+            if not settings:
+                return {"message": "Settings not found"}, 404
+
+            # Update fields
+            updatable_fields = [
+                'default_currency', 'payment_due_day', 'grace_period_days',
+                'late_fee_type', 'late_fee_value', 'late_fee_recurring',
+                'reminder_before_due', 'reminder_before_days',
+                'reminder_after_due', 'reminder_after_days'
             ]
-        )
-        if error:
-            return error, status
 
-        settings = FinanceSettings.query.filter_by(business_id=business_id).first()
-        if not settings:
-            settings = FinanceSettings(business_id=business_id)
-            db.session.add(settings)
+            changes = {}
+            for field in updatable_fields:
+                if field in data:
+                    old_value = getattr(settings, field)
+                    new_value = data[field]
+                    if old_value != new_value:
+                        setattr(settings, field, new_value)
+                        changes[field] = {'old': old_value, 'new': new_value}
 
-        # Track changes for audit log
-        changes = {}
-        for field, value in data.items():
-            if hasattr(settings, field) and getattr(settings, field) != value:
-                changes[field] = {
-                    "old": getattr(settings, field),
-                    "new": value
-                }
-                setattr(settings, field, value)
+            if changes:
+                settings.updated_at = datetime.utcnow()
+                settings.updated_by = current_user_id
+                
+                # Create change log
+                log = ChangeLog(
+                    entity_type="finance_settings",
+                    entity_id=settings.id,
+                    action="update",
+                    changed_by=current_user_id,
+                    details={"changes": changes}
+                )
+                db.session.add(log)
+                db.session.commit()
 
-        settings.updated_by = current_user_id
-        settings.updated_at = datetime.utcnow()
+            # Return updated settings
+            if hasattr(settings, 'to_dict'):
+                return settings.to_dict(), 200
+            else:
+                return {
+                    "business_id": settings.business_id,
+                    "default_currency": settings.default_currency,
+                    # ... other fields ...
+                }, 200
 
-        # Log the changes if any were made
-        if changes:
-            log = ChangeLog(
-                entity_type="finance_settings",
-                entity_id=settings.id,
-                action="update",
-                changed_by=current_user_id,
-                details={"changes": changes}
-            )
-            db.session.add(log)
-
-        db.session.commit()
-
-        return {"message": "Finance settings updated successfully", "settings": settings.to_dict()}
-
+        except Exception as e:
+            db.session.rollback()
+            return {"message": "Error updating settings", "error": str(e)}, 500
 
 class CurrencyOptionsResource(Resource):
     @role_required(["owner", "admin", "salesperson"])
