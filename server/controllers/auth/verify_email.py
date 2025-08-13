@@ -49,6 +49,7 @@ class VerifyEmail(Resource):
                 "id": user.id,
                 "email": user.email,
                 "name": user.name,
+                "role":user.role,
                 "has_business": has_business
             }
         }, 200
