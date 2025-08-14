@@ -49,10 +49,10 @@ def create_app():
     jwt.init_app(app)
     ma.init_app(app)
 
-    with app.app_context():
-        from flask_migrate import upgrade
-        upgrade()
-        seed()
+    # with app.app_context():
+    #     from flask_migrate import upgrade
+    #     upgrade()
+    #     seed()
 
 
     # Register routes
