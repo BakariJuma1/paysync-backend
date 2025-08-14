@@ -17,3 +17,5 @@ class PaymentSchema(ma.SQLAlchemyAutoSchema):
         )
 
     payment_date = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")
+    debt = fields.Nested("DebtSchema", exclude=("payments", "created_by_user"))
+    received_by_user = fields.Nested("UserSchema", exclude=("payments", "debts", "sent_invitations", "changelogs", "owned_businesses", "businesses"))

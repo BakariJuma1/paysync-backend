@@ -1,7 +1,7 @@
 from server.extension import db
-from sqlalchemy_serializer import SerializerMixin
 
-class Item(db.Model, SerializerMixin):
+
+class Item(db.Model):
     __tablename__ = 'items'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -11,13 +11,8 @@ class Item(db.Model, SerializerMixin):
     category = db.Column(db.String, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
 
-    serialize_rules = (
-        '-debt.items',
-        # Add this to prevent deeper recursion
-        '-debt.customer',
-    )
 
-    # Relationship
+    # Rship
     debt = db.relationship("Debt", back_populates="items")
     
     """Always calculate instead of storing to avoid stale data."""
