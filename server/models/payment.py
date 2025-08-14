@@ -1,8 +1,8 @@
 from datetime import datetime
 from server.extension import db
-from sqlalchemy_serializer import SerializerMixin
 
-class Payment(db.Model, SerializerMixin):
+
+class Payment(db.Model):
     __tablename__ = "payments"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -12,14 +12,6 @@ class Payment(db.Model, SerializerMixin):
     method = db.Column(db.String(50))  # cash, mobile money, bank
     received_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
-    serialize_rules = (
-        '-debt.payments',
-        '-received_by_user.payments',
-        # Add these to prevent deeper recursion
-        '-debt.customer',
-        '-debt.created_by_user',
-        '-received_by_user.debts',
-    )
 
     # Relationships
     debt = db.relationship("Debt", back_populates="payments")
