@@ -16,6 +16,21 @@ class Invitation(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    business = db.relationship("Business", backref=db.backref("invitations", cascade="all, delete-orphan"))
-    creator = db.relationship("User", back_populates="sent_invitations")
-    sent_by_user = db.relationship("User", back_populates="sent_invitations")
+    business = db.relationship(
+        "Business",
+        backref=db.backref("invitations", 
+        cascade="all, delete-orphan")
+        )
+    
+    creator = db.relationship(
+        "User",
+        back_populates="sent_invitations",
+        overlaps="sent_by_user"
+        )
+    
+    sent_by_user = db.relationship(
+        "User",
+        back_populates="sent_invitations",
+        
+        overlaps="creator"
+        )

@@ -26,6 +26,7 @@ class Business(db.Model):
     members = db.relationship(
         "User",
         foreign_keys=[User.business_id],
-        backref="business_membership"
+        backref="business_membership",
+        overlaps="business"
     )
     customers = db.relationship("Customer", back_populates="business", cascade="all, delete-orphan")
