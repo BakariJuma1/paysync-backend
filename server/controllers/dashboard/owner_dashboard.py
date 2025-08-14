@@ -5,7 +5,7 @@ from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER
 from server.utils.dashboard_service import DashboardService
 import logging
-
+from sqlalchemy import func  
 from . import dashboard_bp
 
 api = Api(dashboard_bp)
