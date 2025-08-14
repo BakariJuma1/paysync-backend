@@ -6,18 +6,18 @@ class UserSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = User
         load_instance = True
-        include_fk = True  # Include foreign keys like business_id
+        include_fk = True  
         exclude = (
             "password_hash",
             "verification_token",
             "reset_token",
             "verification_secret",
-            "owned_businesses",  # Avoid recursion
-            "businesses",        # Avoid recursion
-            "debts",             # Avoid recursion
-            "payments",          # Avoid recursion
-            "changelogs",        # Avoid recursion
-            "sent_invitations",  # Avoid recursion
+            "owned_businesses",  
+            "businesses",        
+            "debts",             
+            "payments",          
+            "changelogs",        
+            "sent_invitations",  
         )
 
     created_at = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")

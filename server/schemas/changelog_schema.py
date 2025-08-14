@@ -7,7 +7,7 @@ from server.schemas.user_schema import UserSchema  # Make sure this exists
 class ChangeLogSchema(ma.SQLAlchemyAutoSchema):
     changed_by_user = fields.Nested(
         UserSchema,
-        only=("id", "username", "email", "role"),  
+        only=("id", "name", "email", "role"),  
         dump_only=True
     )
 
