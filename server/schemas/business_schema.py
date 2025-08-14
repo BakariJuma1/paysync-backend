@@ -13,11 +13,12 @@ class BusinessSchema(ma.SQLAlchemyAutoSchema):
         dump_only=True
     )
     members = fields.List(
-        fields.Nested(UserSchema, only=("id", "name", "email", "role")),
+        fields.Nested(UserSchema, only=("id", "name", "role")),
         dump_only=True
     )
     customers = fields.List(
-        fields.Nested(CustomerSchema, only=("id", "customer_name", "phone", "email")),
+        # Removed "email" because CustomerSchema does not have it
+        fields.Nested(CustomerSchema, only=("id", "customer_name", "phone", "id_number")),
         dump_only=True
     )
 
