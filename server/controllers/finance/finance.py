@@ -9,15 +9,11 @@ from . import finance_bp
 api = Api(finance_bp)
 
 def make_response(data, code=200):
-    """Ensure all responses are properly formatted JSON"""
-     # If it's already a Flask Response, return as-is
-    if isinstance(data, Response):
-        return data
-    # If it's dict or list, jsonify
+    """Always return JSON-serializable dict/list"""
     if isinstance(data, (dict, list)):
-        return jsonify(data), code
-    # Otherwise, fallback to string
-    return jsonify({"message": str(data)}), code
+        return data, code
+    return {"message": str(data)}, code
+
 
 class FinanceSettingsResource(Resource):
     @role_required(["owner", "admin"])
