@@ -1,7 +1,7 @@
 from flask_restful import Resource, Api
 from flask import request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from server.models import Debt, User, Item
+from server.models import Debt, User, Item, Customer
 from server.extension import db
 from datetime import datetime
 from . import debt_bp
@@ -38,17 +38,46 @@ class DebtResource(Resource):
     def post(self):
         data = request.get_json() or {}
         customer_id = data.get('customer_id')
+        customer_name = data.get('customer_name')
+        phone = data.get('phone')
+        id_number = data.get('id_number')
+        business_id = data.get('business_id')  # Required for creating customer if not exists
+
+        current_user_id = get_jwt_identity()
+
+        # Check if customer exists
         if not customer_id:
-            return jsonify({"message": "customer_id is required"}), 400
-        
+            if not all([customer_name, phone, id_number, business_id]):
+                return jsonify({"message": "Customer details are required if customer_id is not provided"}), 400
+
+            # Check if customer already exists for this business
+            customer = Customer.query.filter_by(
+                customer_name=customer_name,
+                phone=phone,
+                business_id=business_id
+            ).first()
+
+            if not customer:
+                # Create new customer
+                customer = Customer(
+                    customer_name=customer_name,
+                    phone=phone,
+                    id_number=id_number,
+                    business_id=business_id,
+                    created_by=current_user_id
+                )
+                db.session.add(customer)
+                db.session.flush()  # To get customer.id
+            customer_id = customer.id
+        else:
+            customer = Customer.query.get_or_404(customer_id)
+
         due_date = None
         if data.get('due_date'):
             try:
                 due_date = datetime.strptime(data['due_date'], '%Y-%m-%d')
             except ValueError:
                 return jsonify({"message": "due_date must be YYYY-MM-DD format"}), 400
-
-        current_user_id = get_jwt_identity()
 
         debt = Debt(
             customer_id=customer_id,
@@ -105,27 +134,27 @@ class DebtResource(Resource):
             existing_items = {item.id: item for item in debt.items}
             for item_data in items_data:
                 item_id = item_data.get('id')
-            if item_id and item_id in existing_items:
-                # Update existing item
-                item = existing_items[item_id]
-                item.name = item_data.get('name', item.name)
-                item.quantity = item_data.get('quantity', item.quantity)
-                item.price = item_data.get('price', item.price)
-            else:
-                # Add new item
-                item = Item(
-                    debt_id=debt.id,
-                    name=item_data.get('name'),
-                    quantity=item_data.get('quantity', 1),
-                    price=item_data.get('price', 0)
-                )
-                db.session.add(item)
+                if item_id and item_id in existing_items:
+                    # Update existing item
+                    item = existing_items[item_id]
+                    item.name = item_data.get('name', item.name)
+                    item.quantity = item_data.get('quantity', item.quantity)
+                    item.price = item_data.get('price', item.price)
+                else:
+                    # Add new item
+                    item = Item(
+                        debt_id=debt.id,
+                        name=item_data.get('name'),
+                        quantity=item_data.get('quantity', 1),
+                        price=item_data.get('price', 0)
+                    )
+                    db.session.add(item)
 
             if data.get('remove_missing_items', False):
-               payload_ids = [item.get('id') for item in items_data if item.get('id')]
-               for item in debt.items:
-                   if item.id not in payload_ids:
-                       db.session.delete(item)    
+                payload_ids = [item.get('id') for item in items_data if item.get('id')]
+                for item in debt.items:
+                    if item.id not in payload_ids:
+                        db.session.delete(item)    
 
         # Recalculate total and balance
         debt.calculate_total()
