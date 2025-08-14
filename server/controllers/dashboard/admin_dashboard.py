@@ -1,5 +1,4 @@
 from flask_restful import Resource, reqparse, Api
-from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business, Customer, Debt
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_ADMIN
@@ -13,9 +12,9 @@ class ManagerDashboard(Resource):
     @role_required(ROLE_ADMIN)
     def get(self):
         parser = reqparse.RequestParser()
-        parser.add_argument("business_id", type=int, required=True, help="Business ID is required")
-        parser.add_argument("start_date", type=str, required=False)
-        parser.add_argument("end_date", type=str, required=False)
+        parser.add_argument("business_id", type=int, required=True, location="args")
+        parser.add_argument("start_date", type=str, required=False, location="args")
+        parser.add_argument("end_date", type=str, required=False, location="args")
         args = parser.parse_args()
 
         business_id = args["business_id"]
@@ -24,6 +23,7 @@ class ManagerDashboard(Resource):
         if not business:
             return {"message": "Business not found"}, 404
 
+        # Date filters
         date_filter = []
         if args.get("start_date"):
             start_date = datetime.strptime(args["start_date"], "%Y-%m-%d")
@@ -35,13 +35,10 @@ class ManagerDashboard(Resource):
         base_query = Debt.query.join(Customer).filter(Customer.business_id == business_id, *date_filter)
 
         total_debts = base_query.count()
-        total_amount = db.session.query(func.sum(Debt.total)).join(Customer).filter(
-            Customer.business_id == business_id, *date_filter
-        ).scalar() or 0
-        total_paid = db.session.query(func.sum(Debt.amount_paid)).join(Customer).filter(
-            Customer.business_id == business_id, *date_filter
-        ).scalar() or 0
+        total_amount = db.session.query(func.sum(Debt.total)).join(Customer).filter(Customer.business_id == business_id, *date_filter).scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid)).join(Customer).filter(Customer.business_id == business_id, *date_filter).scalar() or 0
         total_balance = sum(d.balance for d in base_query.all())
+        recovery_rate = (total_paid / total_amount * 100) if total_amount else 0
 
         status_counts = dict(
             db.session.query(Debt.status, func.count(Debt.id))
@@ -50,7 +47,6 @@ class ManagerDashboard(Resource):
             .group_by(Debt.status)
             .all()
         )
-        recovery_rate = (total_paid / total_amount * 100) if total_amount else 0
 
         team_performance = (
             db.session.query(
@@ -66,6 +62,7 @@ class ManagerDashboard(Resource):
             .order_by(func.sum(Debt.amount_paid).desc())
             .all()
         )
+
         team_data = [
             {
                 "salesperson": name,
@@ -76,9 +73,7 @@ class ManagerDashboard(Resource):
             for name, total, collected, debts_count in team_performance
         ]
 
-        overdue_list = base_query.filter(Debt.balance > 0, Debt.due_date < datetime.utcnow()).order_by(
-            Debt.due_date.asc()
-        ).all()
+        overdue_list = base_query.filter(Debt.balance > 0, Debt.due_date < datetime.utcnow()).order_by(Debt.due_date.asc()).all()
         overdue_data = [
             {
                 "customer": d.customer.customer_name,
@@ -88,8 +83,6 @@ class ManagerDashboard(Resource):
             }
             for d in overdue_list
         ]
-
-        collection_efficiency = recovery_rate
 
         return {
             "summary": {
@@ -102,7 +95,7 @@ class ManagerDashboard(Resource):
             },
             "team_performance": team_data,
             "overdue_escalations": overdue_data,
-            "collection_efficiency": collection_efficiency
+            "collection_efficiency": recovery_rate
         }
 
 api.add_resource(ManagerDashboard, "/dashboard-manager")
