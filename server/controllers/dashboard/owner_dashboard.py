@@ -1,11 +1,11 @@
+from flask import g
 from flask_restful import Resource, reqparse, Api
-from flask_jwt_extended import get_jwt_identity
-from server.models import db, Customer, Debt, Payment
+from server.models import db, Business, User, Debt, Payment
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER
-from server.utils.dashboard_service import DashboardService
+from datetime import datetime, timedelta
+from sqlalchemy import func
 import logging
-from sqlalchemy import func  
 from . import dashboard_bp
 
 api = Api(dashboard_bp)
@@ -15,65 +15,108 @@ logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-
 class OwnerDashboard(Resource):
     @role_required(ROLE_OWNER)
     def get(self):
-        try:
-            owner_id = get_jwt_identity()
-            business_ids = DashboardService.get_business_ids(owner_id)
+        parser = reqparse.RequestParser()
+        parser.add_argument(
+            "time_range",
+            type=str,
+            required=False,
+            choices=("day", "week", "month", "year")
+        )
+        args = parser.parse_args()
+        time_range = args.get("time_range", "month")
 
-            parser = reqparse.RequestParser()
-            parser.add_argument(
-                "time_range",
-                type=str,
-                required=True,
-                location="args",
-                choices=("week", "month", "quarter", "year"),
-                help="Time range is required and must be: week, month, quarter, year",
-            )
-            parser.add_argument("start_date", type=str, location="args")  # optional
-            parser.add_argument("end_date", type=str, location="args")    # optional
-            args = parser.parse_args()
+        owner_id = g.current_user.id
 
-            date_filter = DashboardService.get_date_filters(args)
+        # --- Businesses owned by this owner ---
+        businesses = Business.query.filter_by(owner_id=owner_id).all()
+        business_ids = [b.id for b in businesses]
 
-            summary = DashboardService.get_summary_stats(business_ids, date_filter)
-            time_based = DashboardService.get_time_based_analytics(business_ids, date_filter)
-            segmentation = DashboardService.get_customer_segmentation(business_ids, date_filter)
-            debt_composition = DashboardService.get_debt_composition(business_ids, date_filter)
-            recent_logs = DashboardService.get_recent_logs(business_ids)
-            upcoming_payments = DashboardService.get_upcoming_payments(business_ids)
+        # --- Base debt query ---
+        base_query = Debt.query.filter(Debt.business_id.in_(business_ids))
 
-            # Average repayment days
-            avg_repayment_days = (
-                db.session.query(func.avg(func.date_part("day", Payment.payment_date - Debt.created_at)))
-                .join(Debt)
-                .join(Customer)
-                .filter(
-                    Customer.business_id.in_(business_ids),
-                    Debt.balance <= 0,
-                    *date_filter
-                )
-                .scalar() or 0
-            )
+        # --- Apply time range filter ---
+        now = datetime.utcnow()
+        if time_range == "day":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif time_range == "week":
+            start_date = now - timedelta(days=now.weekday())
+        elif time_range == "month":
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif time_range == "year":
+            start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            start_date = None
 
-            return {
-                "summary": summary,
-                "time_based_analytics": time_based,
-                "customer_segmentation": segmentation,
-                "debt_composition_by_category": debt_composition,
-                "average_repayment_days": float(avg_repayment_days),
-                "communication_logs": recent_logs,
-                "upcoming_due_payments": upcoming_payments,
+        if start_date:
+            base_query = base_query.filter(Debt.created_at >= start_date)
+
+        # --- SUMMARY ---
+        total_debts = base_query.count()
+        total_amount = db.session.query(func.sum(Debt.total))\
+            .filter(Debt.business_id.in_(business_ids)).scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid))\
+            .filter(Debt.business_id.in_(business_ids)).scalar() or 0
+        total_balance = total_amount - total_paid
+        recovery_rate = (total_paid / total_amount * 100) if total_amount > 0 else 0
+
+        # --- AVERAGE REPAYMENT TIME (in days) ---
+        avg_repayment_days = db.session.query(
+            func.avg(func.extract('epoch', Payment.payment_date - Debt.created_at)/86400)
+        ).join(Debt, Debt.id == Payment.debt_id)\
+         .filter(Debt.business_id.in_(business_ids))\
+         .scalar() or 0
+
+        # --- SALES TEAM PERFORMANCE ---
+        team_performance_query = db.session.query(
+            User.name.label("salesperson"),
+            func.count(Debt.id).label("debts_count"),
+            func.sum(Debt.total).label("total_assigned"),
+            func.sum(Debt.amount_paid).label("total_collected")
+        ).join(Debt, Debt.created_by == User.id)\
+         .filter(Debt.business_id.in_(business_ids))\
+         .group_by(User.name)\
+         .order_by(func.sum(Debt.amount_paid).desc())
+
+        team_data = [
+            {
+                "salesperson": row.salesperson,
+                "debts_count": row.debts_count,
+                "total_assigned": float(row.total_assigned or 0),
+                "total_collected": float(row.total_collected or 0),
             }
+            for row in team_performance_query
+        ]
 
-        except ValueError as e:
-            logger.warning(f"Value error in OwnerDashboard: {e}")
-            return {"message": str(e)}, 400
-        except Exception as e:
-            logger.error(f"Error in OwnerDashboard", exc_info=True)
-            return {"message": "Internal server error", "error": str(e)}, 500
+        # --- OVERDUE DEBTS ---
+        overdue_query = base_query.filter(
+            Debt.balance > 0,
+            Debt.due_date < datetime.utcnow()
+        ).order_by(Debt.due_date.asc())
 
+        overdue_data = [
+            {
+                "customer": debt.customer.customer_name,
+                "due_date": debt.due_date.isoformat() if debt.due_date else None,
+                "balance": float(debt.balance),
+                "salesperson": debt.created_by_user.name
+            }
+            for debt in overdue_query
+        ]
+
+        return {
+            "summary": {
+                "total_debts": total_debts,
+                "total_amount": float(total_amount),
+                "total_paid": float(total_paid),
+                "total_balance": float(total_balance),
+                "recovery_rate": recovery_rate,
+                "avg_repayment_days": float(avg_repayment_days),
+            },
+            "team_performance": team_data,
+            "overdue_debts": overdue_data,
+        }
 
 api.add_resource(OwnerDashboard, "/dashboard-owner")
