@@ -1,4 +1,4 @@
-from flask import request, jsonify
+from flask import request, jsonify,Response
 from flask_restful import Resource, Api
 from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business, FinanceSettings, ChangeLog
@@ -10,9 +10,14 @@ api = Api(finance_bp)
 
 def make_response(data, code=200):
     """Ensure all responses are properly formatted JSON"""
+     # If it's already a Flask Response, return as-is
+    if isinstance(data, Response):
+        return data
+    # If it's dict or list, jsonify
     if isinstance(data, (dict, list)):
         return jsonify(data), code
-    return data, code
+    # Otherwise, fallback to string
+    return jsonify({"message": str(data)}), code
 
 class FinanceSettingsResource(Resource):
     @role_required(["owner", "admin"])
