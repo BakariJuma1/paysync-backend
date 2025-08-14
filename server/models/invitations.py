@@ -1,8 +1,8 @@
 from datetime import datetime
 from server.extension import db
-from sqlalchemy_serializer import SerializerMixin
 
-class Invitation(db.Model, SerializerMixin):
+
+class Invitation(db.Model):
     __tablename__ = "invitations"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -14,14 +14,6 @@ class Invitation(db.Model, SerializerMixin):
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    serialize_rules = (
-        '-business.invitations',
-        '-creator.sent_invitations',
-        # Add these to prevent deeper recursion
-        '-business.owner',
-        '-business.members',
-    )
 
     # Relationships
     business = db.relationship("Business", backref=db.backref("invitations", cascade="all, delete-orphan"))

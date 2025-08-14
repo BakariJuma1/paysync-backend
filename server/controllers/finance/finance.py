@@ -1,10 +1,14 @@
-from flask import request, jsonify,Response
+from flask import request
 from flask_restful import Resource, Api
 from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business, FinanceSettings, ChangeLog
 from server.utils.decorators import role_required
 from datetime import datetime
 from . import finance_bp
+from server.schemas.finance_schema import FinanceSettingsSchema
+
+finance_settings_schema = FinanceSettingsSchema()
+finance_settings_list_schema = FinanceSettingsSchema(many=True)
 
 api = Api(finance_bp)
 
@@ -20,12 +24,12 @@ class FinanceSettingsResource(Resource):
     def get(self, business_id):
         try:
             current_user_id = get_jwt_identity()
-            
+
             # Verify business exists and user has access
             business = Business.query.get(business_id)
             if not business:
                 return make_response({"message": "Business not found"}, 404)
-                
+
             if not (current_user_id == business.owner_id or 
                     User.query.filter_by(id=current_user_id, business_id=business_id).first()):
                 return make_response({"message": "Unauthorized access to business"}, 403)
@@ -34,53 +38,42 @@ class FinanceSettingsResource(Resource):
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
             if not settings:
                 settings = self._create_default_settings(business_id)
-            
-            return make_response(settings.to_dict())
+
+            return make_response(finance_settings_schema.dump(settings))
 
         except Exception as e:
-            return make_response({
-                "message": "Server error",
-                "error": str(e)
-            }, 500)
+            return make_response({"message": "Server error", "error": str(e)}, 500)
 
     @role_required(["owner", "admin"])
     def put(self, business_id):
         try:
             current_user_id = get_jwt_identity()
             data = request.get_json()
-            
             if not data:
                 return make_response({"message": "No data provided"}, 400)
 
-            # Verify business and access
             business = Business.query.get(business_id)
             if not business:
                 return make_response({"message": "Business not found"}, 404)
-                
+
             if not (current_user_id == business.owner_id or 
                     User.query.filter_by(id=current_user_id, business_id=business_id).first()):
                 return make_response({"message": "Unauthorized access to business"}, 403)
 
-            # Get existing settings
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
             if not settings:
                 settings = self._create_default_settings(business_id)
 
-            # Update fields
             changes = self._update_settings(settings, data, current_user_id)
-            
             if changes:
                 self._log_changes(settings, changes, current_user_id)
                 db.session.commit()
 
-            return make_response(settings.to_dict())
+            return make_response(finance_settings_schema.dump(settings))
 
         except Exception as e:
             db.session.rollback()
-            return make_response({
-                "message": "Error updating settings", 
-                "error": str(e)
-            }, 500)
+            return make_response({"message": "Error updating settings", "error": str(e)}, 500)
 
     def _create_default_settings(self, business_id):
         default_settings = FinanceSettings(
@@ -109,28 +102,23 @@ class FinanceSettingsResource(Resource):
             'reminder_before_due', 'reminder_before_days',
             'reminder_after_due', 'reminder_after_days', 'reminder_method'
         ]
-        
         changes = {}
         for field in updatable_fields:
             if field in data:
                 old_value = getattr(settings, field)
                 new_value = data[field]
-                
                 if field in ['payment_due_day', 'grace_period_days', 'reminder_before_days', 'reminder_after_days']:
                     new_value = int(new_value)
                 elif field in ['late_fee_value', 'late_fee_max']:
                     new_value = float(new_value)
                 elif field in ['late_fee_recurring', 'reminder_before_due', 'reminder_after_due']:
                     new_value = bool(new_value)
-                
                 if old_value != new_value:
                     setattr(settings, field, new_value)
                     changes[field] = {'old': old_value, 'new': new_value}
-        
         if changes:
             settings.updated_at = datetime.utcnow()
             settings.updated_by = user_id
-            
         return changes
 
     def _log_changes(self, settings, changes, user_id):
@@ -142,6 +130,7 @@ class FinanceSettingsResource(Resource):
             details={"changes": changes}
         )
         db.session.add(log)
+
 
 class CurrencyOptionsResource(Resource):
     @role_required(["owner", "admin", "salesperson"])
@@ -158,103 +147,53 @@ class CurrencyOptionsResource(Resource):
             ]
         })
 
+
 class PaymentTermsResource(Resource):
     @role_required(["owner", "admin"])
     def get(self, business_id):
         try:
-            current_user_id = get_jwt_identity()
-            
-            business = Business.query.get(business_id)
-            if not business:
-                return make_response({"message": "Business not found"}, 404)
-                
-            if not (current_user_id == business.owner_id or 
-                    User.query.filter_by(id=current_user_id, business_id=business_id).first()):
-                return make_response({"message": "Unauthorized access to business"}, 403)
-
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
             if not settings:
                 settings = FinanceSettings(business_id=business_id)
                 db.session.add(settings)
                 db.session.commit()
-            
-            return make_response({
-                "payment_due_day": settings.payment_due_day,
-                "grace_period_days": settings.grace_period_days
-            })
-            
+            return make_response(finance_settings_schema.dump(settings, only=("payment_due_day", "grace_period_days")))
         except Exception as e:
-            return make_response({
-                "message": "Server error",
-                "error": str(e)
-            }, 500)
+            return make_response({"message": "Server error", "error": str(e)}, 500)
+
 
 class LateFeeRulesResource(Resource):
     @role_required(["owner", "admin"])
     def get(self, business_id):
         try:
-            current_user_id = get_jwt_identity()
-            
-            business = Business.query.get(business_id)
-            if not business:
-                return make_response({"message": "Business not found"}, 404)
-                
-            if not (current_user_id == business.owner_id or 
-                    User.query.filter_by(id=current_user_id, business_id=business_id).first()):
-                return make_response({"message": "Unauthorized access to business"}, 403)
-
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
             if not settings:
                 settings = FinanceSettings(business_id=business_id)
                 db.session.add(settings)
                 db.session.commit()
-            
-            return make_response({
-                "late_fee_type": settings.late_fee_type,
-                "late_fee_value": float(settings.late_fee_value),
-                "late_fee_max": float(settings.late_fee_max),
-                "late_fee_recurring": settings.late_fee_recurring
-            })
-            
+            return make_response(finance_settings_schema.dump(settings, only=(
+                "late_fee_type", "late_fee_value", "late_fee_max", "late_fee_recurring"
+            )))
         except Exception as e:
-            return make_response({
-                "message": "Server error",
-                "error": str(e)
-            }, 500)
+            return make_response({"message": "Server error", "error": str(e)}, 500)
+
 
 class ReminderSettingsResource(Resource):
     @role_required(["owner", "admin"])
     def get(self, business_id):
         try:
-            current_user_id = get_jwt_identity()
-            
-            business = Business.query.get(business_id)
-            if not business:
-                return make_response({"message": "Business not found"}, 404)
-                
-            if not (current_user_id == business.owner_id or 
-                    User.query.filter_by(id=current_user_id, business_id=business_id).first()):
-                return make_response({"message": "Unauthorized access to business"}, 403)
-
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
             if not settings:
                 settings = FinanceSettings(business_id=business_id)
                 db.session.add(settings)
                 db.session.commit()
-            
-            return make_response({
-                "reminder_before_due": settings.reminder_before_due,
-                "reminder_before_days": settings.reminder_before_days,
-                "reminder_after_due": settings.reminder_after_due,
-                "reminder_after_days": settings.reminder_after_days,
-                "reminder_method": settings.reminder_method
-            })
-            
+            return make_response(finance_settings_schema.dump(settings, only=(
+                "reminder_before_due", "reminder_before_days",
+                "reminder_after_due", "reminder_after_days", "reminder_method"
+            )))
         except Exception as e:
-            return make_response({
-                "message": "Server error",
-                "error": str(e)
-            }, 500)
+            return make_response({"message": "Server error", "error": str(e)}, 500)
+
 
 # Register resources
 api.add_resource(FinanceSettingsResource, "/settings/<int:business_id>")
