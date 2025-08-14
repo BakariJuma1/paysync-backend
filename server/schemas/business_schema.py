@@ -9,11 +9,11 @@ from server.schemas.customer_schema import CustomerSchema
 class BusinessSchema(ma.SQLAlchemyAutoSchema):
     owner = fields.Nested(
         UserSchema,
-        only=("id", "username", "email", "role"),
+        only=("id", "name", "email", "role"),
         dump_only=True
     )
     members = fields.List(
-        fields.Nested(UserSchema, only=("id", "username", "email", "role")),
+        fields.Nested(UserSchema, only=("id", "name", "email", "role")),
         dump_only=True
     )
     customers = fields.List(
