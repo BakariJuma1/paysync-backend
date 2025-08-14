@@ -10,8 +10,9 @@ api = Api(dashboard_bp)
 
 
 class ManagerDashboard(Resource):
-    @role_required(ROLE_ADMIN)  # Only admins (managers) can access
+    @role_required(ROLE_ADMIN)
     def get(self):
+        # --- Parse query parameters ---
         parser = reqparse.RequestParser()
         parser.add_argument("business_id", type=int, required=True, help="Business ID is required")
         parser.add_argument("start_date", type=str, required=False)
@@ -25,36 +26,28 @@ class ManagerDashboard(Resource):
         if not business:
             return {"message": "Business not found"}, 404
 
-        # Date filters
+        # --- Date filters ---
         date_filter = []
-        if args["start_date"]:
+        if args.get("start_date"):
             start_date = datetime.strptime(args["start_date"], "%Y-%m-%d")
             date_filter.append(Debt.created_at >= start_date)
-        if args["end_date"]:
+        if args.get("end_date"):
             end_date = datetime.strptime(args["end_date"], "%Y-%m-%d")
             date_filter.append(Debt.created_at <= end_date)
 
-        # Base query (only this business)
-        base_query = db.session.query(Debt).join(Customer).filter(
-            Customer.business_id == business_id,
-            *date_filter
-        )
+        # --- Base query for this business ---
+        base_query = Debt.query.join(Customer).filter(Customer.business_id == business_id, *date_filter)
 
         # --- SUMMARY ---
         total_debts = base_query.count()
-        total_amount = (
-            db.session.query(func.sum(Debt.total))
-            .join(Customer)
-            .filter(Customer.business_id == business_id, *date_filter)
-            .scalar() or 0
-        )
-        total_paid = (
-            db.session.query(func.sum(Debt.amount_paid))
-            .join(Customer)
-            .filter(Customer.business_id == business_id, *date_filter)
-            .scalar() or 0
-        )
-        total_balance = total_amount - total_paid
+        total_amount = db.session.query(func.sum(Debt.total)).join(Customer).filter(
+            Customer.business_id == business_id, *date_filter
+        ).scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid)).join(Customer).filter(
+            Customer.business_id == business_id, *date_filter
+        ).scalar() or 0
+        total_balance = sum(d.balance for d in base_query.all())  # Python property
+
         status_counts = dict(
             db.session.query(Debt.status, func.count(Debt.id))
             .join(Customer)
@@ -62,9 +55,9 @@ class ManagerDashboard(Resource):
             .group_by(Debt.status)
             .all()
         )
-        recovery_rate = (total_paid / total_amount * 100) if total_amount > 0 else 0
+        recovery_rate = (total_paid / total_amount * 100) if total_amount else 0
 
-        # --- SALES TEAM PERFORMANCE ---
+        # --- TEAM PERFORMANCE ---
         team_performance = (
             db.session.query(
                 User.name.label("salesperson"),
@@ -90,17 +83,9 @@ class ManagerDashboard(Resource):
         ]
 
         # --- OVERDUE ESCALATIONS ---
-        overdue_list = (
-            db.session.query(Debt)
-            .join(Customer)
-            .filter(
-                Customer.business_id == business_id,
-                Debt.balance > 0,
-                Debt.due_date < datetime.utcnow()
-            )
-            .order_by(Debt.due_date.asc())
-            .all()
-        )
+        overdue_list = base_query.filter(Debt.balance > 0, Debt.due_date < datetime.utcnow()).order_by(
+            Debt.due_date.asc()
+        ).all()
         overdue_data = [
             {
                 "customer": d.customer.customer_name,
@@ -117,9 +102,9 @@ class ManagerDashboard(Resource):
         return {
             "summary": {
                 "total_debts": total_debts,
-                "total_amount": total_amount,
-                "total_paid": total_paid,
-                "total_balance": total_balance,
+                "total_amount": float(total_amount),
+                "total_paid": float(total_paid),
+                "total_balance": float(total_balance),
                 "status_breakdown": status_counts,
                 "recovery_rate": recovery_rate
             },
@@ -129,4 +114,4 @@ class ManagerDashboard(Resource):
         }
 
 
-api.add_resource(ManagerDashboard, '/dashboard-manager')
+api.add_resource(ManagerDashboard, "/dashboard-manager")

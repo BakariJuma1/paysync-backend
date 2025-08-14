@@ -6,22 +6,23 @@ from server.schemas.user_schema import UserSchema
 
 # For reading responses
 class ChangeLogSchema(ma.SQLAlchemyAutoSchema):
-    # Nested field for the user who made the change
     changed_by_user = fields.Nested(
         UserSchema,
         only=("id", "name", "email", "role"),
         dump_only=True
     )
-
-    # Format timestamp
+    changed_by_name = fields.Method("get_user_name")
     timestamp = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")
 
     class Meta:
         model = ChangeLog
         load_instance = True
         include_fk = True
-        dump_only = ("id", "timestamp")  
+        dump_only = ("id", "timestamp")
         exclude = ("changed_by_user.changelogs",)
+
+    def get_user_name(self, obj):
+        return obj.changed_by_user.name if obj.changed_by_user else None
 
 
 # For creating/updating

@@ -15,3 +15,4 @@ class ChangeLog(db.Model):
 
     # Relationships
     changed_by_user = db.relationship("User", back_populates="changelogs")
+    
