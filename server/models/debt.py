@@ -1,8 +1,7 @@
 from datetime import datetime
 from server.extension import db
-from sqlalchemy_serializer import SerializerMixin
 
-class Debt(db.Model, SerializerMixin):
+class Debt(db.Model):
     __tablename__ = 'debts'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -25,15 +24,7 @@ class Debt(db.Model, SerializerMixin):
     items = db.relationship("Item", back_populates="debt", cascade="all, delete-orphan")
     payments = db.relationship("Payment", back_populates="debt", cascade="all, delete-orphan")
 
-    serialize_rules = (
-        '-customer.debts',
-        '-items.debt',
-        '-payments.debt',
-        '-created_by_user.debts',
-        # Add these to prevent deeper recursion
-        '-created_by_user.payments',
-        '-created_by_user.changelogs',
-    )
+  
 
     def calculate_total(self):
         self.total = sum(item.total_price for item in self.items)
@@ -46,3 +37,7 @@ class Debt(db.Model, SerializerMixin):
             'unpaid' if self.amount_paid == 0 else
             'partial'
         )
+    @property
+    def balance(self):
+        return self.total - self.amount_paid
+    
