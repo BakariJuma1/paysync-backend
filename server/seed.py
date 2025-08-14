@@ -1,6 +1,5 @@
 # seed.py
 from datetime import datetime, timedelta
-from server import create_app
 from server.models import (
     db, User, Business, Customer, Debt, 
     Item, Payment, Invitation, FinanceSettings,
