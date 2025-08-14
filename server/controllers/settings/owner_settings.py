@@ -3,7 +3,7 @@ from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business
 from werkzeug.security import generate_password_hash
 from server.utils.decorators import role_required
-from server.utils.roles import ROLE_OWNER, ROLE_MANAGER, ROLE_SALESPERSON
+from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON
 from . import settings_bp
 
 api = Api(settings_bp)
@@ -89,7 +89,7 @@ class OwnerUserManagement(Resource):
         parser.add_argument(
             "role",
             type=str,
-            choices=(ROLE_MANAGER, ROLE_SALESPERSON),
+            choices=(ROLE_ADMIN, ROLE_SALESPERSON),
             required=True
         )
         args = parser.parse_args()
@@ -126,7 +126,7 @@ class OwnerUserDetail(Resource):
             return {"message": "User not found or does not belong to your business"}, 404
 
         parser = reqparse.RequestParser()
-        parser.add_argument("role", type=str, choices=(ROLE_MANAGER, ROLE_SALESPERSON))
+        parser.add_argument("role", type=str, choices=(ROLE_ADMIN, ROLE_SALESPERSON))
         parser.add_argument("password", type=str)
         args = parser.parse_args()
 
