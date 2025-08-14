@@ -8,7 +8,7 @@ from server.utils.decorators import role_required
 from server.service.email_invite import send_invitation_email
 from server.utils.generate_invite_token import generate_invite_token
 from server.utils.helper import parse_json
-from server.utils.roles import ROLE_OWNER, ROLE_MANAGER, ROLE_SALESPERSON
+from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON
 from . import onboarding_bp
 
 api = Api(onboarding_bp)
@@ -32,7 +32,7 @@ class InvitationResource(Resource):
 
             data, error, status = parse_json(
                 required_fields=["name", "email", "role"],
-                allowed_roles=(ROLE_MANAGER, ROLE_SALESPERSON)
+                allowed_roles=(ROLE_ADMIN, ROLE_SALESPERSON)
             )
             if error:
                 return make_response(error, status)
@@ -140,7 +140,7 @@ class OwnerUserDetail(Resource):
         if not user:
             return make_response({"message": "User not found or does not belong to your business"}, 404)
 
-        data, error, status = parse_json(allowed_roles=(ROLE_MANAGER, ROLE_SALESPERSON))
+        data, error, status = parse_json(allowed_roles=(ROLE_ADMIN, ROLE_SALESPERSON))
         if error:
             return make_response(error, status)
 
