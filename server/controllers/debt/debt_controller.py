@@ -102,10 +102,17 @@ class DebtResource(Resource):
         # Optional: update items
         items_data = data.get('items')
         if items_data is not None:
-            # Clear existing items
-            debt.items.clear()
-            db.session.flush()
+            existing_items = {item.id: item for item in debt.items}
             for item_data in items_data:
+                item_id = item_data.get('id')
+            if item_id and item_id in existing_items:
+                # Update existing item
+                item = existing_items[item_id]
+                item.name = item_data.get('name', item.name)
+                item.quantity = item_data.get('quantity', item.quantity)
+                item.price = item_data.get('price', item.price)
+            else:
+                # Add new item
                 item = Item(
                     debt_id=debt.id,
                     name=item_data.get('name'),
@@ -113,6 +120,12 @@ class DebtResource(Resource):
                     price=item_data.get('price', 0)
                 )
                 db.session.add(item)
+
+            if data.get('remove_missing_items', False):
+               payload_ids = [item.get('id') for item in items_data if item.get('id')]
+               for item in debt.items:
+                   if item.id not in payload_ids:
+                       db.session.delete(item)    
 
         # Recalculate total and balance
         debt.calculate_total()
