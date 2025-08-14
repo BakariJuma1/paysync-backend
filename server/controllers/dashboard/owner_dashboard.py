@@ -1,6 +1,6 @@
 from flask_restful import Resource, reqparse, Api
 from flask import g
-from server.models import db, Business, Debt, Payment, User
+from server.models import db, Business, Debt, Payment, User, Customer
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER
 from sqlalchemy import func
@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from . import dashboard_bp
 
 api = Api(dashboard_bp)
+
 
 class OwnerDashboard(Resource):
     @role_required(ROLE_OWNER)
@@ -25,12 +26,15 @@ class OwnerDashboard(Resource):
 
         owner_id = g.current_user.id
 
-        # Filter businesses owned by this owner
+        # All businesses owned by this owner
         businesses = Business.query.filter_by(owner_id=owner_id).all()
         business_ids = [b.id for b in businesses]
 
-        # Base debt query
-        base_query = Debt.query.join(Payment, isouter=True).filter(Debt.business_id.in_(business_ids))
+        if not business_ids:
+            return {"message": "No businesses found for this owner"}, 404
+
+        # Base debt query: join Customer to access business_id
+        base_query = Debt.query.join(Customer).filter(Customer.business_id.in_(business_ids))
 
         # Apply time range filter
         now = datetime.utcnow()
@@ -47,8 +51,14 @@ class OwnerDashboard(Resource):
 
         # SUMMARY
         total_debts = base_query.count()
-        total_amount = db.session.query(func.sum(Debt.total)).filter(Debt.business_id.in_(business_ids)).scalar() or 0
-        total_paid = db.session.query(func.sum(Debt.amount_paid)).filter(Debt.business_id.in_(business_ids)).scalar() or 0
+        total_amount = db.session.query(func.sum(Debt.total))\
+            .join(Customer)\
+            .filter(Customer.business_id.in_(business_ids))\
+            .scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid))\
+            .join(Customer)\
+            .filter(Customer.business_id.in_(business_ids))\
+            .scalar() or 0
         total_balance = total_amount - total_paid
         recovery_rate = (total_paid / total_amount * 100) if total_amount > 0 else 0
 
@@ -56,7 +66,8 @@ class OwnerDashboard(Resource):
         avg_days_query = (
             db.session.query(func.avg(func.date_part("day", Payment.payment_date - Debt.created_at)))
             .join(Debt, Debt.id == Payment.debt_id)
-            .filter(Debt.business_id.in_(business_ids))
+            .join(Customer)
+            .filter(Customer.business_id.in_(business_ids))
         )
         avg_repayment_days = avg_days_query.scalar() or 0
 
@@ -69,7 +80,8 @@ class OwnerDashboard(Resource):
                 func.sum(Debt.amount_paid).label("total_collected")
             )
             .join(Debt, Debt.created_by == User.id)
-            .filter(Debt.business_id.in_(business_ids))
+            .join(Customer)
+            .filter(Customer.business_id.in_(business_ids))
             .group_by(User.name)
             .order_by(func.sum(Debt.amount_paid).desc())
         )
@@ -84,8 +96,8 @@ class OwnerDashboard(Resource):
         ]
 
         # OVERDUE DEBTS
-        overdue_query = Debt.query.filter(
-            Debt.business_id.in_(business_ids),
+        overdue_query = Debt.query.join(Customer).filter(
+            Customer.business_id.in_(business_ids),
             Debt.balance > 0,
             Debt.due_date < datetime.utcnow()
         ).order_by(Debt.due_date.asc())
@@ -111,5 +123,6 @@ class OwnerDashboard(Resource):
             "team_performance": team_data,
             "overdue_debts": overdue_data,
         }
+
 
 api.add_resource(OwnerDashboard, "/dashboard-owner")

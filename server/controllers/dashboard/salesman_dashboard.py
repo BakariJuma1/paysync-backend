@@ -9,6 +9,7 @@ from . import dashboard_bp
 
 api = Api(dashboard_bp)
 
+
 class SalesmanDashboard(Resource):
     @role_required(ROLE_SALESPERSON)
     def get(self):
@@ -19,6 +20,7 @@ class SalesmanDashboard(Resource):
         parser.add_argument("end_date", type=str, required=False, location="args")
         args = parser.parse_args()
 
+        # DATE FILTERS
         date_filter = []
         if args.get("start_date"):
             start_date = datetime.strptime(args["start_date"], "%Y-%m-%d")
@@ -27,14 +29,21 @@ class SalesmanDashboard(Resource):
             end_date = datetime.strptime(args["end_date"], "%Y-%m-%d")
             date_filter.append(Debt.created_at <= end_date)
 
+        # BASE DEBT QUERY
         base_query = Debt.query.filter(Debt.created_by == user_id, *date_filter)
 
+        # SUMMARY METRICS
         total_debts = base_query.count()
-        total_amount = db.session.query(func.sum(Debt.total)).filter(Debt.created_by == user_id, *date_filter).scalar() or 0
-        total_paid = db.session.query(func.sum(Debt.amount_paid)).filter(Debt.created_by == user_id, *date_filter).scalar() or 0
+        total_amount = db.session.query(func.sum(Debt.total))\
+            .filter(Debt.created_by == user_id, *date_filter)\
+            .scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid))\
+            .filter(Debt.created_by == user_id, *date_filter)\
+            .scalar() or 0
         total_balance = sum(d.balance for d in base_query.all())
         recovery_rate = (total_paid / total_amount * 100) if total_amount else 0
 
+        # STATUS BREAKDOWN
         status_counts = dict(
             db.session.query(Debt.status, func.count(Debt.id))
             .filter(Debt.created_by == user_id, *date_filter)
@@ -42,6 +51,7 @@ class SalesmanDashboard(Resource):
             .all()
         )
 
+        # CUSTOMER BALANCES
         customers = (
             db.session.query(
                 Customer.customer_name,
@@ -58,6 +68,7 @@ class SalesmanDashboard(Resource):
             for name, phone, balance in customers
         ]
 
+        # UPCOMING PAYMENTS
         upcoming = (
             base_query.filter(Debt.balance > 0, Debt.due_date >= datetime.utcnow())
             .order_by(Debt.due_date.asc())
@@ -65,10 +76,15 @@ class SalesmanDashboard(Resource):
             .all()
         )
         upcoming_data = [
-            {"customer": d.customer.customer_name, "due_date": d.due_date.isoformat() if d.due_date else None, "balance": float(d.balance)}
+            {
+                "customer": d.customer.customer_name,
+                "due_date": d.due_date.isoformat() if d.due_date else None,
+                "balance": float(d.balance)
+            }
             for d in upcoming
         ]
 
+        # RECENT COMMUNICATIONS
         communications = (
             ChangeLog.query.filter_by(changed_by=user_id)
             .order_by(ChangeLog.timestamp.desc())
@@ -77,7 +93,8 @@ class SalesmanDashboard(Resource):
         )
         comm_data = [{"timestamp": c.timestamp.isoformat(), "details": c.details} for c in communications]
 
-        target_amount = 5000
+        # PERFORMANCE VS TARGET
+        target_amount = 5000  # You can replace with dynamic target if needed
         achievement_percent = (total_paid / target_amount * 100) if target_amount > 0 else 0
 
         return {
@@ -98,5 +115,6 @@ class SalesmanDashboard(Resource):
                 "achievement_percent": achievement_percent,
             },
         }
+
 
 api.add_resource(SalesmanDashboard, "/dashboard-salesman")

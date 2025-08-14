@@ -8,6 +8,7 @@ from . import dashboard_bp
 
 api = Api(dashboard_bp)
 
+
 class ManagerDashboard(Resource):
     @role_required(ROLE_ADMIN)
     def get(self):
@@ -32,14 +33,23 @@ class ManagerDashboard(Resource):
             end_date = datetime.strptime(args["end_date"], "%Y-%m-%d")
             date_filter.append(Debt.created_at <= end_date)
 
+        # Base debt query
         base_query = Debt.query.join(Customer).filter(Customer.business_id == business_id, *date_filter)
 
+        # SUMMARY
         total_debts = base_query.count()
-        total_amount = db.session.query(func.sum(Debt.total)).join(Customer).filter(Customer.business_id == business_id, *date_filter).scalar() or 0
-        total_paid = db.session.query(func.sum(Debt.amount_paid)).join(Customer).filter(Customer.business_id == business_id, *date_filter).scalar() or 0
+        total_amount = db.session.query(func.sum(Debt.total))\
+            .join(Customer)\
+            .filter(Customer.business_id == business_id, *date_filter)\
+            .scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid))\
+            .join(Customer)\
+            .filter(Customer.business_id == business_id, *date_filter)\
+            .scalar() or 0
         total_balance = sum(d.balance for d in base_query.all())
         recovery_rate = (total_paid / total_amount * 100) if total_amount else 0
 
+        # STATUS BREAKDOWN
         status_counts = dict(
             db.session.query(Debt.status, func.count(Debt.id))
             .join(Customer)
@@ -48,12 +58,13 @@ class ManagerDashboard(Resource):
             .all()
         )
 
+        # SALES TEAM PERFORMANCE
         team_performance = (
             db.session.query(
                 User.name.label("salesperson"),
+                func.count(Debt.id).label("debts_count"),
                 func.sum(Debt.total).label("total_assigned"),
-                func.sum(Debt.amount_paid).label("total_collected"),
-                func.count(Debt.id).label("debts_count")
+                func.sum(Debt.amount_paid).label("total_collected")
             )
             .join(Debt, Debt.created_by == User.id)
             .join(Customer, Customer.id == Debt.customer_id)
@@ -66,19 +77,20 @@ class ManagerDashboard(Resource):
         team_data = [
             {
                 "salesperson": name,
+                "debts_count": debts_count,
                 "total_assigned": float(total or 0),
-                "total_collected": float(collected or 0),
-                "debts_count": debts_count
+                "total_collected": float(collected or 0)
             }
-            for name, total, collected, debts_count in team_performance
+            for name, debts_count, total, collected in team_performance
         ]
 
+        # OVERDUE DEBTS
         overdue_list = base_query.filter(Debt.balance > 0, Debt.due_date < datetime.utcnow()).order_by(Debt.due_date.asc()).all()
         overdue_data = [
             {
                 "customer": d.customer.customer_name,
                 "due_date": d.due_date.isoformat() if d.due_date else None,
-                "balance": d.balance,
+                "balance": float(d.balance),
                 "salesperson": d.created_by_user.name
             }
             for d in overdue_list
@@ -97,5 +109,6 @@ class ManagerDashboard(Resource):
             "overdue_escalations": overdue_data,
             "collection_efficiency": recovery_rate
         }
+
 
 api.add_resource(ManagerDashboard, "/dashboard-manager")
