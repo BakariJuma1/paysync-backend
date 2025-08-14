@@ -12,7 +12,6 @@ class Customer(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     business_id = db.Column(db.Integer, db.ForeignKey("businesses.id"), nullable=False)
-
     
     # Relationships
     debts = db.relationship("Debt", back_populates='customer', cascade="all, delete-orphan")

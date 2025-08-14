@@ -3,15 +3,15 @@ from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business
 from werkzeug.security import generate_password_hash
 from server.utils.decorators import role_required
+from server.utils.roles import ROLE_OWNER, ROLE_MANAGER, ROLE_SALESPERSON
 from . import settings_bp
 
 api = Api(settings_bp)
 
 
-
 # BUSINESS INFO
 class OwnerBusinessSettings(Resource):
-    @role_required("owner")
+    @role_required(ROLE_OWNER)
     def get(self):
         owner_id = get_jwt_identity()
         business = Business.query.filter_by(owner_id=owner_id).first()
@@ -26,7 +26,7 @@ class OwnerBusinessSettings(Resource):
             "created_at": business.created_at.isoformat()
         }
 
-    @role_required("owner")
+    @role_required(ROLE_OWNER)
     def put(self):
         owner_id = get_jwt_identity()
         business = Business.query.filter_by(owner_id=owner_id).first()
@@ -46,10 +46,11 @@ class OwnerBusinessSettings(Resource):
 
         db.session.commit()
         return {"message": "Business updated successfully"}
-    
 
+
+# OWNER USER MANAGEMENT
 class OwnerUserManagement(Resource):
-    @role_required("owner")
+    @role_required(ROLE_OWNER)
     def get(self):
         owner_id = get_jwt_identity()
         business = Business.query.filter_by(owner_id=owner_id).first()
@@ -57,7 +58,6 @@ class OwnerUserManagement(Resource):
         if not business:
             return {"message": "Business not found"}, 404
 
-        # Fetch all users in this business except the owner
         users = User.query.filter(
             User.business_id == business.id,
             User.id != owner_id
@@ -74,7 +74,7 @@ class OwnerUserManagement(Resource):
             for u in users
         ]
 
-    @role_required("owner")
+    @role_required(ROLE_OWNER)
     def post(self):
         owner_id = get_jwt_identity()
         business = Business.query.filter_by(owner_id=owner_id).first()
@@ -86,7 +86,12 @@ class OwnerUserManagement(Resource):
         parser.add_argument("name", type=str, required=True)
         parser.add_argument("email", type=str, required=True)
         parser.add_argument("password", type=str, required=True)
-        parser.add_argument("role", type=str, choices=("manager", "salesperson"), required=True)
+        parser.add_argument(
+            "role",
+            type=str,
+            choices=(ROLE_MANAGER, ROLE_SALESPERSON),
+            required=True
+        )
         args = parser.parse_args()
 
         if User.query.filter_by(email=args["email"]).first():
@@ -106,11 +111,9 @@ class OwnerUserManagement(Resource):
         return {"message": f"{args['role'].capitalize()} created successfully"}
 
 
-
 # UPDATE / DELETE USER
-
 class OwnerUserDetail(Resource):
-    @role_required("owner")
+    @role_required(ROLE_OWNER)
     def put(self, user_id):
         owner_id = get_jwt_identity()
         business = Business.query.filter_by(owner_id=owner_id).first()
@@ -118,13 +121,12 @@ class OwnerUserDetail(Resource):
         if not business:
             return {"message": "Business not found"}, 404
 
-        # Ensure this user belongs to the owner's business
         user = User.query.filter_by(id=user_id, business_id=business.id).first()
         if not user:
             return {"message": "User not found or does not belong to your business"}, 404
 
         parser = reqparse.RequestParser()
-        parser.add_argument("role", type=str, choices=("manager", "salesperson"))
+        parser.add_argument("role", type=str, choices=(ROLE_MANAGER, ROLE_SALESPERSON))
         parser.add_argument("password", type=str)
         args = parser.parse_args()
 
@@ -136,7 +138,7 @@ class OwnerUserDetail(Resource):
         db.session.commit()
         return {"message": "User updated successfully"}
 
-    @role_required("owner")
+    @role_required(ROLE_OWNER)
     def delete(self, user_id):
         owner_id = get_jwt_identity()
         business = Business.query.filter_by(owner_id=owner_id).first()
@@ -144,7 +146,6 @@ class OwnerUserDetail(Resource):
         if not business:
             return {"message": "Business not found"}, 404
 
-        # Ensure this user belongs to the owner's business
         user = User.query.filter_by(id=user_id, business_id=business.id).first()
         if not user:
             return {"message": "User not found or does not belong to your business"}, 404
@@ -154,9 +155,7 @@ class OwnerUserDetail(Resource):
         return {"message": "User deleted successfully"}
 
 
-
 # ROUTE REGISTRATION
-
 api.add_resource(OwnerBusinessSettings, '/owner/business')
 api.add_resource(OwnerUserManagement, '/owner/users')
 api.add_resource(OwnerUserDetail, '/owner/users/<int:user_id>')

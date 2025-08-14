@@ -1,8 +1,8 @@
 from datetime import datetime
 from server.extension import db
-from sqlalchemy_serializer import SerializerMixin
 
-class ChangeLog(db.Model, SerializerMixin):
+
+class ChangeLog(db.Model):
     __tablename__ = "changelogs"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -12,15 +12,6 @@ class ChangeLog(db.Model, SerializerMixin):
     changed_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     details = db.Column(db.JSON)
-
-    serialize_rules = (
-        '-changed_by_user.changelogs',
-        '-changed_by_user.debts',
-        '-changed_by_user.payments',
-        '-changed_by_user.owned_businesses',
-        '-changed_by_user.businesses',
-        '-changed_by_user.sent_invitations',
-    )
 
     # Relationships
     changed_by_user = db.relationship("User", back_populates="changelogs")

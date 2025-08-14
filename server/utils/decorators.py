@@ -1,20 +1,20 @@
 from functools import wraps
 from flask_jwt_extended import get_jwt, verify_jwt_in_request
 from flask import jsonify
+from .roles import ROLE_SALESPERSON, ROLE_ADMIN, ROLE_OWNER
 
- 
-    # Restrict access to users with certain roles.
-    # Example: @role_required("owner", "admin")
-    
+# restrict access to specific roles
 def role_required(*roles):
-   
     def wrapper(fn):
         @wraps(fn)
         def decorator(*args, **kwargs):
-            verify_jwt_in_request()  
+            verify_jwt_in_request()
             claims = get_jwt()
-            if "role" not in claims or claims["role"] not in roles:
+            user_role = claims.get("role")
+
+            if user_role not in roles:
                 return jsonify({"message": "Forbidden: Insufficient permissions"}), 403
+
             return fn(*args, **kwargs)
         return decorator
     return wrapper

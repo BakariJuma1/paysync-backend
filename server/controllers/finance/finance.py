@@ -1,16 +1,19 @@
 from flask import request
 from flask_restful import Resource, Api
 from flask_jwt_extended import get_jwt_identity
+from datetime import datetime
+
 from server.models import db, User, Business, FinanceSettings, ChangeLog
 from server.utils.decorators import role_required
-from datetime import datetime
-from . import finance_bp
+from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON
 from server.schemas.finance_schema import FinanceSettingsSchema
+from . import finance_bp
 
 finance_settings_schema = FinanceSettingsSchema()
 finance_settings_list_schema = FinanceSettingsSchema(many=True)
 
 api = Api(finance_bp)
+
 
 def make_response(data, code=200):
     """Always return JSON-serializable dict/list"""
@@ -20,7 +23,7 @@ def make_response(data, code=200):
 
 
 class FinanceSettingsResource(Resource):
-    @role_required(["owner", "admin"])
+    @role_required(ROLE_OWNER, ROLE_ADMIN)
     def get(self, business_id):
         try:
             current_user_id = get_jwt_identity()
@@ -44,7 +47,7 @@ class FinanceSettingsResource(Resource):
         except Exception as e:
             return make_response({"message": "Server error", "error": str(e)}, 500)
 
-    @role_required(["owner", "admin"])
+    @role_required(ROLE_OWNER, ROLE_ADMIN)
     def put(self, business_id):
         try:
             current_user_id = get_jwt_identity()
@@ -133,7 +136,7 @@ class FinanceSettingsResource(Resource):
 
 
 class CurrencyOptionsResource(Resource):
-    @role_required(["owner", "admin", "salesperson"])
+    @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def get(self):
         return make_response({
             "currencies": [
@@ -149,7 +152,7 @@ class CurrencyOptionsResource(Resource):
 
 
 class PaymentTermsResource(Resource):
-    @role_required(["owner", "admin"])
+    @role_required(ROLE_OWNER, ROLE_ADMIN)
     def get(self, business_id):
         try:
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
@@ -163,7 +166,7 @@ class PaymentTermsResource(Resource):
 
 
 class LateFeeRulesResource(Resource):
-    @role_required(["owner", "admin"])
+    @role_required(ROLE_OWNER, ROLE_ADMIN)
     def get(self, business_id):
         try:
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()
@@ -179,7 +182,7 @@ class LateFeeRulesResource(Resource):
 
 
 class ReminderSettingsResource(Resource):
-    @role_required(["owner", "admin"])
+    @role_required(ROLE_OWNER, ROLE_ADMIN)
     def get(self, business_id):
         try:
             settings = FinanceSettings.query.filter_by(business_id=business_id).first()

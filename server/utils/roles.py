@@ -1,0 +1,6 @@
+
+ROLE_SALESPERSON = "salesperson"
+ROLE_ADMIN = "admin"   
+ROLE_OWNER = "owner"
+
+ALL_ROLES = [ROLE_SALESPERSON, ROLE_ADMIN, ROLE_OWNER]
