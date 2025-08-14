@@ -2,12 +2,13 @@ from flask import Flask,jsonify
 from flask_cors import CORS
 from flask_restful import Api
 from dotenv import load_dotenv
-from server.extension import db, migrate, jwt
+from server.extension import db, migrate, jwt,ma
 from server.routes_controller import register_routes
 import os
 from datetime import timedelta
 import logging
 from server.seed import seed
+
 
 load_dotenv()
 
@@ -46,6 +47,7 @@ def create_app():
     migrate.init_app(app, db)
     api = Api(app)
     jwt.init_app(app)
+    ma.init_app(app)
 
     with app.app_context():
         from flask_migrate import upgrade

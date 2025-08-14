@@ -5,66 +5,50 @@ from server.models import User
 from server.extension import db
 from . import auth_bp
 from server.utils.decorators import role_required  
+from server.schemas.user_schema import UserSchema
 
 api = Api(auth_bp)
+user_schema = UserSchema()
 
 class MeResource(Resource):
     @jwt_required()
     def get(self):
-        """Get the currently logged-in user's info"""
-        current_user_id = get_jwt_identity()
-        user = User.query.get_or_404(current_user_id)
-        return user.to_dict(), 200
+        user = User.query.get_or_404(get_jwt_identity())
+        return user_schema.dump(user), 200
 
     @jwt_required()
     @role_required("owner")
     def put(self):
-        """Full update of current owner's info (restricted fields)"""
-        current_user_id = get_jwt_identity()
-        user = User.query.get_or_404(current_user_id)
-
+        user = User.query.get_or_404(get_jwt_identity())
         data = request.get_json()
         for field in ["name", "email", "phone"]:
             if field in data:
                 setattr(user, field, data[field])
-
         db.session.commit()
-        return user.to_dict(), 200
+        return user_schema.dump(user), 200
 
     @jwt_required()
     def patch(self):
-        """Partial update of current user's info (restricted fields)"""
-        current_user_id = get_jwt_identity()
-        user = User.query.get_or_404(current_user_id)
-
+        user = User.query.get_or_404(get_jwt_identity())
         data = request.get_json()
-
-        # Restrict allowed fields by role
-        if user.role != "owner":
-            allowed_fields = ["name", "email", "phone"]
-        else:
-            allowed_fields = ["name", "email", "phone", "password"]
-
+        allowed_fields = ["name", "email", "phone"]
+        if user.role == "owner":
+            allowed_fields.append("password")
         for field in allowed_fields:
             if field in data:
                 if field == "password":
-                    user.set_password(data[field])  
+                    user.set_password(data[field])
                 else:
                     setattr(user, field, data[field])
-
         db.session.commit()
-        return user.to_dict(), 200
+        return user_schema.dump(user), 200
 
     @jwt_required()
     @role_required("owner")
     def delete(self):
-        """Delete the currently logged-in owner's account"""
-        current_user_id = get_jwt_identity()
-        user = User.query.get_or_404(current_user_id)
-
+        user = User.query.get_or_404(get_jwt_identity())
         db.session.delete(user)
         db.session.commit()
-
         return {"message": "Account deleted successfully"}, 200
 
 api.add_resource(MeResource, '/me')

@@ -1,9 +1,9 @@
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from server.extension import db
-from sqlalchemy_serializer import SerializerMixin
 
-class User(db.Model, SerializerMixin):
+
+class User(db.Model,):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -30,20 +30,6 @@ class User(db.Model, SerializerMixin):
         foreign_keys="Business.owner_id",
         back_populates="owner"
     )
-    serialize_rules = (
-        '-password_hash',
-        '-verification_token',
-        '-reset_token',
-        '-verification_secret',
-        '-owned_businesses',  # Completely exclude owned_businesses
-        '-businesses',        # Completely exclude businesses
-        '-debts',            # Completely exclude debts
-        '-payments',
-        '-changelogs',
-        '-sent_invitations',
-    )
-  
-
     # Relationships
     debts = db.relationship("Debt", back_populates="created_by_user")
     payments = db.relationship("Payment", back_populates="received_by_user")
@@ -52,7 +38,7 @@ class User(db.Model, SerializerMixin):
     sent_invitations = db.relationship("Invitation", back_populates="creator", cascade="all, delete-orphan")
 
 
-
+    # Password management
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
