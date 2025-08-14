@@ -1,4 +1,5 @@
 from flask_restful import Resource, reqparse, Api
+from flask_jwt_extended import get_jwt_identity
 from server.models import db, User, Business, Customer, Debt
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_ADMIN
@@ -8,17 +9,17 @@ from . import dashboard_bp
 
 api = Api(dashboard_bp)
 
-
 class ManagerDashboard(Resource):
     @role_required(ROLE_ADMIN)
     def get(self):
         parser = reqparse.RequestParser()
-        parser.add_argument("business_id", type=int, required=True, location="args")
-        parser.add_argument("start_date", type=str, required=False, location="args")
-        parser.add_argument("end_date", type=str, required=False, location="args")
+        parser.add_argument("business_id", type=int, required=True, help="Business ID is required")
+        parser.add_argument("start_date", type=str, required=False)
+        parser.add_argument("end_date", type=str, required=False)
         args = parser.parse_args()
 
         business_id = args["business_id"]
+
         business = Business.query.get(business_id)
         if not business:
             return {"message": "Business not found"}, 404
@@ -88,6 +89,8 @@ class ManagerDashboard(Resource):
             for d in overdue_list
         ]
 
+        collection_efficiency = recovery_rate
+
         return {
             "summary": {
                 "total_debts": total_debts,
@@ -99,8 +102,7 @@ class ManagerDashboard(Resource):
             },
             "team_performance": team_data,
             "overdue_escalations": overdue_data,
-            "collection_efficiency": recovery_rate
+            "collection_efficiency": collection_efficiency
         }
-
 
 api.add_resource(ManagerDashboard, "/dashboard-manager")

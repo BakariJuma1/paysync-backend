@@ -1,5 +1,5 @@
 from flask_restful import Resource, reqparse, Api
-from flask import g
+from flask_jwt_extended import get_jwt_identity
 from server.models import db, Customer, Debt, ChangeLog
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_SALESPERSON
@@ -9,11 +9,10 @@ from . import dashboard_bp
 
 api = Api(dashboard_bp)
 
-
 class SalesmanDashboard(Resource):
     @role_required(ROLE_SALESPERSON)
     def get(self):
-        user_id = g.current_user.id
+        user_id = get_jwt_identity()
 
         parser = reqparse.RequestParser()
         parser.add_argument("start_date", type=str, required=False, location="args")
@@ -31,8 +30,12 @@ class SalesmanDashboard(Resource):
         base_query = Debt.query.filter(Debt.created_by == user_id, *date_filter)
 
         total_debts = base_query.count()
-        total_amount = db.session.query(func.sum(Debt.total)).filter(Debt.created_by == user_id, *date_filter).scalar() or 0
-        total_paid = db.session.query(func.sum(Debt.amount_paid)).filter(Debt.created_by == user_id, *date_filter).scalar() or 0
+        total_amount = db.session.query(func.sum(Debt.total)).filter(
+            Debt.created_by == user_id, *date_filter
+        ).scalar() or 0
+        total_paid = db.session.query(func.sum(Debt.amount_paid)).filter(
+            Debt.created_by == user_id, *date_filter
+        ).scalar() or 0
         total_balance = sum(d.balance for d in base_query.all())
 
         status_counts = dict(
@@ -66,11 +69,9 @@ class SalesmanDashboard(Resource):
             .all()
         )
         upcoming_data = [
-            {
-                "customer": d.customer.customer_name,
-                "due_date": d.due_date.isoformat() if d.due_date else None,
-                "balance": float(d.balance),
-            }
+            {"customer": d.customer.customer_name,
+             "due_date": d.due_date.isoformat() if d.due_date else None,
+             "balance": float(d.balance)}
             for d in upcoming
         ]
 
@@ -85,8 +86,8 @@ class SalesmanDashboard(Resource):
             for c in communications
         ]
 
-        target_amount = 5000  # TODO: fetch dynamically
-        achievement_percent = (total_paid / target_amount * 100) if target_amount > 0 else 0
+        target_amount = 5000  # placeholder
+        achievement_percent = (total_paid / target_amount * 100) if target_amount else 0
 
         return {
             "summary": {
@@ -106,6 +107,5 @@ class SalesmanDashboard(Resource):
                 "achievement_percent": achievement_percent,
             },
         }
-
 
 api.add_resource(SalesmanDashboard, "/dashboard-salesman")

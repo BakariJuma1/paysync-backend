@@ -1,5 +1,5 @@
 from flask_restful import Resource, reqparse, Api
-from flask import g
+from flask_jwt_extended import get_jwt_identity
 from server.models import db, Business, Debt, Payment, User
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER
@@ -9,29 +9,26 @@ from . import dashboard_bp
 
 api = Api(dashboard_bp)
 
-
 class OwnerDashboard(Resource):
     @role_required(ROLE_OWNER)
     def get(self):
-        # --- Parse query parameters from GET ---
         parser = reqparse.RequestParser()
-        parser.add_argument(
-            "time_range", type=str, required=False,
-            choices=("day", "week", "month", "year"),
-            location="args"
-        )
+        parser.add_argument("time_range", type=str, required=False, choices=("day", "week", "month", "year"))
         args = parser.parse_args()
 
-        owner_id = g.current_user.id
+        owner_id = get_jwt_identity()
         time_range = args.get("time_range", "month")
 
+        # --- Filter businesses owned by this owner ---
         businesses = Business.query.filter_by(owner_id=owner_id).all()
         business_ids = [b.id for b in businesses]
 
+        # --- Base debt query ---
         base_query = Debt.query.join(Payment, isouter=True).filter(Debt.business_id.in_(business_ids))
 
-        # --- Time range filter ---
+        # --- Apply time range filter ---
         now = datetime.utcnow()
+        start_date = None
         if time_range == "day":
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         elif time_range == "week":
@@ -40,25 +37,25 @@ class OwnerDashboard(Resource):
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         elif time_range == "year":
             start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            start_date = None
-
         if start_date:
             base_query = base_query.filter(Debt.created_at >= start_date)
 
+        # --- SUMMARY ---
         total_debts = base_query.count()
         total_amount = db.session.query(func.sum(Debt.total)).filter(Debt.business_id.in_(business_ids)).scalar() or 0
         total_paid = db.session.query(func.sum(Debt.amount_paid)).filter(Debt.business_id.in_(business_ids)).scalar() or 0
         total_balance = total_amount - total_paid
-        recovery_rate = (total_paid / total_amount * 100) if total_amount else 0
+        recovery_rate = (total_paid / total_amount * 100) if total_amount > 0 else 0
 
-        avg_days_query = (
+        # --- AVERAGE REPAYMENT TIME ---
+        avg_repayment_days = (
             db.session.query(func.avg(func.date_part("day", Payment.payment_date - Debt.created_at)))
             .join(Debt, Debt.id == Payment.debt_id)
             .filter(Debt.business_id.in_(business_ids))
+            .scalar() or 0
         )
-        avg_repayment_days = avg_days_query.scalar() or 0
 
+        # --- TEAM PERFORMANCE ---
         team_performance_query = (
             db.session.query(
                 User.name.label("salesperson"),
@@ -81,6 +78,7 @@ class OwnerDashboard(Resource):
             for row in team_performance_query
         ]
 
+        # --- OVERDUE DEBTS ---
         overdue_query = Debt.query.filter(
             Debt.business_id.in_(business_ids),
             Debt.balance > 0,
@@ -108,6 +106,5 @@ class OwnerDashboard(Resource):
             "team_performance": team_data,
             "overdue_debts": overdue_data,
         }
-
 
 api.add_resource(OwnerDashboard, "/dashboard-owner")
