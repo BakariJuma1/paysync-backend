@@ -1,27 +1,14 @@
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
+import resend
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
+resend.api_key = os.getenv("RESEND_API_KEY")
+
 def send_password_reset_email(email, name, reset_token):
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("MAIL_DEFAULT_SENDER")
 
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-    sender = {
-        "email": os.getenv("MAIL_DEFAULT_SENDER"),
-        "name": "PaySync"
-    }
-
-    to = [{
-        "email": email,
-        "name": name
-    }]
-
-    subject = "Password Reset Request"
     html_content = f"""
     <html>
     <body>
@@ -37,15 +24,13 @@ def send_password_reset_email(email, name, reset_token):
     </html>
     """
 
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=to,
-        sender=sender,
-        subject=subject,
-        html_content=html_content
-    )
-
     try:
-        response = api_instance.send_transac_email(send_smtp_email)
+        response = resend.Emails.send({
+            "from": f"PaySync <{sender_email}>",
+            "to": [email],
+            "subject": "Password Reset Request",
+            "html": html_content
+        })
         logger.info(f"Password reset email sent to {email}. Response: {response}")
-    except ApiException as e:
-        logger.error(f"Failed to send password reset email to {email}. Brevo error: {e}")
+    except Exception as e:
+        logger.error(f"Failed to send password reset email to {email}. Resend error: {e}")

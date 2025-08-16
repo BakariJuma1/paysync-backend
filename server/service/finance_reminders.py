@@ -1,37 +1,16 @@
 # server/service/finance_reminders.py
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
+import resend
 import os
 import logging
-from datetime import datetime, timedelta
 from server.models import Debt, Customer, Business, FinanceSettings
 
 logger = logging.getLogger(__name__)
 
+# Set API key once
+resend.api_key = os.getenv("RESEND_API_KEY")
+
 def send_payment_reminder_email(customer_email, customer_name, business_name, debt_details, reminder_type):
-    """
-    Send a payment reminder email to a customer
-    
-    :param customer_email: Email of the customer
-    :param customer_name: Name of the customer
-    :param business_name: Name of the business
-    :param debt_details: Dictionary containing debt information
-    :param reminder_type: 'before_due' or 'after_due'
-    """
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
-
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-    sender = {
-        "email": os.getenv("MAIL_DEFAULT_SENDER"),
-        "name": business_name
-    }
-
-    to = [{
-        "email": customer_email,
-        "name": customer_name
-    }]
+    sender_email = os.getenv("MAIL_DEFAULT_SENDER")
 
     if reminder_type == 'before_due':
         subject = f"Upcoming Payment Due: {business_name}"
@@ -92,17 +71,15 @@ def send_payment_reminder_email(customer_email, customer_name, business_name, de
     </html>
     """
 
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=to,
-        sender=sender,
-        subject=subject,
-        html_content=html_content
-    )
-
     try:
-        response = api_instance.send_transac_email(send_smtp_email)
+        response = resend.Emails.send({
+            "from": f"{business_name} <{sender_email}>",
+            "to": [customer_email],
+            "subject": subject,
+            "html": html_content
+        })
         logger.info(f"Payment reminder email sent to {customer_email}. Type: {reminder_type}")
         return True
-    except ApiException as e:
-        logger.error(f"Failed to send payment reminder to {customer_email}. Brevo error: {e}")
+    except Exception as e:
+        logger.error(f"Failed to send payment reminder to {customer_email}. Resend error: {e}")
         return False

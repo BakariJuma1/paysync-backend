@@ -19,7 +19,7 @@ debts_schema = DebtSchema(many=True)
 
 class DebtResource(Resource):
 
-    @jwt_required()
+    @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def get(self, debt_id=None):
         current_user = g.current_user
 
@@ -36,7 +36,7 @@ class DebtResource(Resource):
 
         return debts_schema.dump(debts), 200
 
-    @jwt_required()
+    @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def post(self):
         data = request.get_json() or {}
         current_user = g.current_user
@@ -103,7 +103,7 @@ class DebtResource(Resource):
         db.session.commit()
         return debt_schema.dump(debt), 201
 
-    @jwt_required()
+    @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def put(self, debt_id):
         debt = Debt.query.get_or_404(debt_id)
         current_user = g.current_user
@@ -160,7 +160,8 @@ class DebtResource(Resource):
 
         return debt_schema.dump(debt), 200
 
-    @jwt_required()
+    
+    @role_required(ROLE_OWNER)
     def delete(self, debt_id):
         debt = Debt.query.get_or_404(debt_id)
         current_user = g.current_user
