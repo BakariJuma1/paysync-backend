@@ -1,14 +1,31 @@
-import resend
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Set API key once
-resend.api_key = os.getenv("RESEND_API_KEY")
-
 def send_verification_email(user, otp_code):
-    sender_email = os.getenv("MAIL_DEFAULT_SENDER")  # e.g. no-reply@yourdomain.com
+    
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
+
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+
+    sender = {
+        "email": os.getenv("MAIL_DEFAULT_SENDER"),
+        "name": "PaySync"
+    }
+
+    to = [{
+        "email": user.email,
+        "name": user.name
+    }]
+    print(f"[DEBUG] About to send email to: {user.email!r}, name: {user.name!r}")
+    logger.info(f"[DEBUG] About to send email to: {user.email!r}, name: {user.name!r}")
+
+
+    subject = "Verify your email"
 
     html_content = f"""
     <html>
@@ -28,13 +45,15 @@ def send_verification_email(user, otp_code):
     </html>
     """
 
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=to,
+        sender=sender,
+        subject=subject,
+        html_content=html_content
+    )
+
     try:
-        response = resend.Emails.send({
-            "from": f"PaySync <{sender_email}>",
-            "to": [user.email],
-            "subject": "Verify your email",
-            "html": html_content
-        })
+        response = api_instance.send_transac_email(send_smtp_email)
         logger.info(f"Verification email sent to {user.email}. Response: {response}")
-    except Exception as e:
-        logger.error(f"Failed to send verification email to {user.email}. Resend error: {e}")
+    except ApiException as e:
+        logger.error(f"Failed to send verification email to {user.email}. Brevo error: {e}")
