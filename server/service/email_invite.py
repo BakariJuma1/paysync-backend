@@ -1,35 +1,17 @@
-import sib_api_v3_sdk
-from sib_api_v3_sdk.rest import ApiException
 import os
 import logging
-from datetime import datetime, timedelta
+import resend
 
 logger = logging.getLogger(__name__)
 
+
+resend.api_key = os.getenv("RESEND_API_KEY")
+
 def send_invitation_email(user_email, user_name, business_name, role, invite_url):
     """
-    Send an invitation email to join the business
-    
-    :param user_email: Email of the invited user
-    :param user_name: Name of the invited user
-    :param business_name: Name of the business they're being invited to
-    :param role: Role they're being invited as
-    :param invite_url: URL to accept the invitation
+    Send an invitation email using Resend
     """
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = os.getenv("BREVO_API_KEY")
-
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-    sender = {
-        "email": os.getenv("MAIL_DEFAULT_SENDER"),
-        "name": "PaySync"
-    }
-
-    to = [{
-        "email": user_email,
-        "name": user_name
-    }]
+    sender = os.getenv("MAIL_DEFAULT_SENDER")
 
     subject = f"Invitation to join {business_name} as {role}"
 
@@ -55,17 +37,15 @@ def send_invitation_email(user_email, user_name, business_name, role, invite_url
     </html>
     """
 
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=to,
-        sender=sender,
-        subject=subject,
-        html_content=html_content
-    )
-
     try:
-        response = api_instance.send_transac_email(send_smtp_email)
+        response = resend.Emails.send({
+            "from": sender,
+            "to": user_email,
+            "subject": subject,
+            "html": html_content,
+        })
         logger.info(f"Invitation email sent to {user_email}. Response: {response}")
         return True
-    except ApiException as e:
-        logger.error(f"Failed to send invitation email to {user_email}. Brevo error: {e}")
+    except Exception as e:
+        logger.error(f"Failed to send invitation email to {user_email}. Resend error: {e}")
         return False
