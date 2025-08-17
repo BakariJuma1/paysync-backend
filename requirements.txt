@@ -58,4 +58,4 @@ zope.event==5.0
 zope.interface==7.2
 marshmallow-sqlalchemy 
 gunicorn
-
+resend==0.6.0
