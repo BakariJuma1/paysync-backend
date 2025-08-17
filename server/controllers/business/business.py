@@ -31,7 +31,7 @@ def get_my_business():
     if not business:
         return jsonify({"message": "No business found"}), 404
 
-    return business_schema.jsonify(business), 200
+    return  business_schema.dump(business), 200
 
 
 class BusinessResource(Resource):
@@ -82,6 +82,7 @@ class BusinessResource(Resource):
             )
             db.session.add(business)
             db.session.commit()
+            db.session.refresh(business)
 
             return {
                 "business": business_schema.dump(business),
