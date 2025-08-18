@@ -27,23 +27,17 @@ class Debt(db.Model):
     items = db.relationship("Item", back_populates="debt", cascade="all, delete-orphan")
     payments = db.relationship("Payment", back_populates="debt", cascade="all, delete-orphan")
     
-     # -----------------------
-    # Calculate total from items
-    # -----------------------
     def calculate_total(self):
         self.total = sum(item.total_price for item in self.items)
         return self.total
-
-    # -----------------------
+    
     # Hybrid property for balance
-    # -----------------------
     @hybrid_property
     def balance(self):
         return self.total - sum(payment.amount for payment in self.payments)
 
     @balance.expression
     def balance(cls):
-        # Use scalar_subquery for SQLAlchemy 2.x
         return cls.total - (
             select(func.coalesce(func.sum(Payment.amount), 0))
             .where(Payment.debt_id == cls.id)
