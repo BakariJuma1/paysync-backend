@@ -8,7 +8,7 @@ class DebtSchema(ma.SQLAlchemyAutoSchema):
         model = Debt
         load_instance = True
         include_fk = True
-        # Exclude relationships that would cause recursion
+        
         exclude = (
             "customer.debts",
             "items.debt",

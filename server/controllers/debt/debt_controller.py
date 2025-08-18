@@ -98,7 +98,7 @@ class DebtResource(Resource):
             ))
 
         debt.calculate_total()
-        debt.update_balance()
+        
 
         db.session.commit()
         return debt_schema.dump(debt), 201
