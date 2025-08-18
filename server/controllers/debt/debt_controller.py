@@ -31,7 +31,7 @@ class DebtResource(Resource):
 
         if current_user.role in [ROLE_OWNER, ROLE_ADMIN]:
             debts = Debt.query.all()
-        else:  # salesperson
+        else:  
             debts = Debt.query.filter_by(created_by=current_user.id).all()
 
         return debts_schema.dump(debts), 200
@@ -41,7 +41,7 @@ class DebtResource(Resource):
         data = request.get_json() or {}
         current_user = g.current_user
 
-        # --- Handle customer creation or lookup ---
+        #  Handle customer creation or lookup 
         customer_id = data.get("customer_id")
         if not customer_id:
             required_fields = ["customer_name", "phone", "id_number", "business_id"]
@@ -69,7 +69,7 @@ class DebtResource(Resource):
         else:
             customer = Customer.query.get_or_404(customer_id)
 
-        # --- Handle due date ---
+        #  Handle due date 
         due_date = None
         if data.get("due_date"):
             try:
@@ -77,7 +77,7 @@ class DebtResource(Resource):
             except ValueError:
                 return {"message": "due_date must be YYYY-MM-DD format"}, 400
 
-        # --- Create debt ---
+        # Create debt
         debt = Debt(
             customer_id=customer_id,
             due_date=due_date,
