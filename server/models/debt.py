@@ -18,6 +18,8 @@ class Debt(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_reminder_sent = db.Column(db.DateTime)  
     reminder_count = db.Column(db.Integer, default=0)
+    category = db.Column(db.String, nullable=False, default="Uncategorized")
+
     
     # Relationships
     customer = db.relationship("Customer", back_populates="debts")
