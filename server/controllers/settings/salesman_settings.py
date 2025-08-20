@@ -7,7 +7,7 @@ from server.utils.roles import ROLE_SALESPERSON
 from . import settings_bp
 
 api = Api(settings_bp)
-
+ 
 
 # SALESPERSON BUSINESS INFO (READ-ONLY)
 class SalespersonBusinessInfo(Resource):
