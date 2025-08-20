@@ -21,6 +21,9 @@ def make_response(data, code=200):
     return {"message": str(data)}, code
 
 
+# --------------------
+# INVITATIONS
+# --------------------
 class InvitationResource(Resource):
     @role_required(ROLE_OWNER)
     def post(self):
@@ -84,6 +87,9 @@ class InvitationResource(Resource):
             return make_response({"message": "Server error", "error": str(e)}, 500)
 
 
+# --------------------
+# TEAM MANAGEMENT (USERS + INVITES)
+# --------------------
 class OwnerUserManagement(Resource):
     @role_required(ROLE_OWNER)
     def get(self):
@@ -128,6 +134,9 @@ class OwnerUserManagement(Resource):
         })
 
 
+# --------------------
+# USER DETAIL
+# --------------------
 class OwnerUserDetail(Resource):
     @role_required(ROLE_OWNER)
     def put(self, user_id):
@@ -146,7 +155,7 @@ class OwnerUserDetail(Resource):
 
         if "role" in data:
             user.role = data["role"]
-            db.session.commit()
+        db.session.commit()
 
         return make_response({"message": "User updated successfully"})
 
@@ -166,13 +175,22 @@ class OwnerUserDetail(Resource):
         return make_response({"message": "User deleted successfully"})
 
 
+# --------------------
+# INVITATION ACTIONS
+# --------------------
 class InvitationActions(Resource):
     @role_required(ROLE_OWNER)
     def post(self, invitation_id):
         owner_id = get_jwt_identity()
+
+        # Ensure business scoping
+        business = Business.query.filter_by(owner_id=owner_id).first()
+        if not business:
+            return make_response({"message": "Business not found"}, 404)
+
         invitation = Invitation.query.filter_by(
             id=invitation_id,
-            created_by=owner_id
+            business_id=business.id
         ).first()
         if not invitation:
             return make_response({"message": "Invitation not found"}, 404)
@@ -180,11 +198,11 @@ class InvitationActions(Resource):
         if invitation.expires_at < datetime.utcnow():
             return make_response({"message": "Invitation has expired"}, 400)
 
+        # Regenerate token
         invitation.token = generate_invite_token()
         invitation.expires_at = datetime.utcnow() + timedelta(hours=48)
         db.session.commit()
 
-        business = Business.query.get(invitation.business_id)
         frontend_url = os.getenv('FRONTEND_URL', '').rstrip('/')
         invite_url = f"{frontend_url}/accept-invite?token={invitation.token}"
 
@@ -204,9 +222,14 @@ class InvitationActions(Resource):
     @role_required(ROLE_OWNER)
     def delete(self, invitation_id):
         owner_id = get_jwt_identity()
+
+        business = Business.query.filter_by(owner_id=owner_id).first()
+        if not business:
+            return make_response({"message": "Business not found"}, 404)
+
         invitation = Invitation.query.filter_by(
             id=invitation_id,
-            created_by=owner_id
+            business_id=business.id
         ).first()
         if not invitation:
             return make_response({"message": "Invitation not found"}, 404)
@@ -216,7 +239,9 @@ class InvitationActions(Resource):
         return make_response({"message": "Invitation cancelled successfully"})
 
 
-# Route registration
+# --------------------
+# ROUTE REGISTRATION
+# --------------------
 api.add_resource(InvitationResource, "/owner/invitations")
 api.add_resource(OwnerUserManagement, "/owner/team")
 api.add_resource(OwnerUserDetail, "/owner/team/<int:user_id>")
