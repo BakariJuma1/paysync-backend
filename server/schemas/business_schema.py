@@ -1,8 +1,9 @@
-from marshmallow import fields
+from marshmallow import fields,EXCLUDE
 from server.extension import ma
 from server.models import Business
 from server.schemas.user_schema import UserSchema
 from server.schemas.customer_schema import CustomerSchema
+
 
 
 # For reading responses
@@ -27,6 +28,7 @@ class BusinessSchema(ma.SQLAlchemyAutoSchema):
         load_instance = True
         include_fk = True
         dump_only = ("id", "created_at")
+        unknown = EXCLUDE
 
 
 # For creating/updating
