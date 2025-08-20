@@ -13,11 +13,12 @@ api = Api(settings_bp)
 class OwnerBusinessSettings(Resource):
     @role_required(ROLE_OWNER)
     def get(self):
-        owner_id = get_jwt_identity()
-        business = Business.query.filter_by(owner_id=owner_id).first()
+        current_user_id = get_jwt_identity()
+        owner = User.query.get_or_404(current_user_id)
 
+        business = Business.query.filter_by(id=owner.business_id, owner_id=owner.id).first()
         if not business:
-            return {"message": "Business not found"}, 404
+            return {"message": "Business not found or does not belong to you"}, 404
 
         return {
             "id": business.id,
@@ -28,11 +29,12 @@ class OwnerBusinessSettings(Resource):
 
     @role_required(ROLE_OWNER)
     def put(self):
-        owner_id = get_jwt_identity()
-        business = Business.query.filter_by(owner_id=owner_id).first()
+        current_user_id = get_jwt_identity()
+        owner = User.query.get_or_404(current_user_id)
 
+        business = Business.query.filter_by(id=owner.business_id, owner_id=owner.id).first()
         if not business:
-            return {"message": "Business not found"}, 404
+            return {"message": "Business not found or does not belong to you"}, 404
 
         parser = reqparse.RequestParser()
         parser.add_argument("name", type=str)
@@ -52,15 +54,16 @@ class OwnerBusinessSettings(Resource):
 class OwnerUserManagement(Resource):
     @role_required(ROLE_OWNER)
     def get(self):
-        owner_id = get_jwt_identity()
-        business = Business.query.filter_by(owner_id=owner_id).first()
+        current_user_id = get_jwt_identity()
+        owner = User.query.get_or_404(current_user_id)
 
+        business = Business.query.filter_by(id=owner.business_id, owner_id=owner.id).first()
         if not business:
-            return {"message": "Business not found"}, 404
+            return {"message": "Business not found or does not belong to you"}, 404
 
         users = User.query.filter(
             User.business_id == business.id,
-            User.id != owner_id
+            User.id != owner.id
         ).all()
 
         return [
@@ -76,11 +79,12 @@ class OwnerUserManagement(Resource):
 
     @role_required(ROLE_OWNER)
     def post(self):
-        owner_id = get_jwt_identity()
-        business = Business.query.filter_by(owner_id=owner_id).first()
+        current_user_id = get_jwt_identity()
+        owner = User.query.get_or_404(current_user_id)
 
+        business = Business.query.filter_by(id=owner.business_id, owner_id=owner.id).first()
         if not business:
-            return {"message": "Business not found"}, 404
+            return {"message": "Business not found or does not belong to you"}, 404
 
         parser = reqparse.RequestParser()
         parser.add_argument("name", type=str, required=True)
@@ -115,11 +119,12 @@ class OwnerUserManagement(Resource):
 class OwnerUserDetail(Resource):
     @role_required(ROLE_OWNER)
     def put(self, user_id):
-        owner_id = get_jwt_identity()
-        business = Business.query.filter_by(owner_id=owner_id).first()
+        current_user_id = get_jwt_identity()
+        owner = User.query.get_or_404(current_user_id)
 
+        business = Business.query.filter_by(id=owner.business_id, owner_id=owner.id).first()
         if not business:
-            return {"message": "Business not found"}, 404
+            return {"message": "Business not found or does not belong to you"}, 404
 
         user = User.query.filter_by(id=user_id, business_id=business.id).first()
         if not user:
@@ -140,11 +145,12 @@ class OwnerUserDetail(Resource):
 
     @role_required(ROLE_OWNER)
     def delete(self, user_id):
-        owner_id = get_jwt_identity()
-        business = Business.query.filter_by(owner_id=owner_id).first()
+        current_user_id = get_jwt_identity()
+        owner = User.query.get_or_404(current_user_id)
 
+        business = Business.query.filter_by(id=owner.business_id, owner_id=owner.id).first()
         if not business:
-            return {"message": "Business not found"}, 404
+            return {"message": "Business not found or does not belong to you"}, 404
 
         user = User.query.filter_by(id=user_id, business_id=business.id).first()
         if not user:

@@ -15,6 +15,28 @@ customer_schema = CustomerSchema()
 customers_schema = CustomerSchema(many=True)
 
 
+def can_access_customer(user, customer, allow_sales=False):
+    """
+    Enforce business scoping for customers.
+    - Owner/Admin: must match their business
+    - Salesperson: only if tied to their debts AND business matches
+    """
+    if customer.business_id != user.business_id:
+        return False
+
+    if user.role in [ROLE_OWNER, ROLE_ADMIN]:
+        return True
+
+    if user.role == ROLE_SALESPERSON and allow_sales:
+        debt_exists = Debt.query.filter_by(
+            customer_id=customer.id,
+            created_by=user.id
+        ).first()
+        return debt_exists is not None
+
+    return False
+
+
 class CustomerResource(Resource):
 
     @jwt_required()
@@ -26,45 +48,50 @@ class CustomerResource(Resource):
         if customer_id:
             customer = Customer.query.get_or_404(customer_id)
 
-            # Salesperson restriction: only see customers tied to their debts
-            if current_user.role == ROLE_SALESPERSON:
-                debt_exists = Debt.query.filter_by(
-                    customer_id=customer.id,
-                    created_by=current_user_id
-                ).first()
-                if not debt_exists:
-                    return jsonify({"message": "Access denied"}), 403
+            if not can_access_customer(current_user, customer, allow_sales=True):
+                return jsonify({"message": "Access denied"}), 403
 
             return customer_schema.dump(customer), 200
 
-        # Owners/Admins: see all customers
-        if current_user.role in (ROLE_OWNER, ROLE_ADMIN):
-            customers = Customer.query.all()
-        else:
-            # Salesperson: see only customers linked to their debts
+        # List customers
+        if current_user.role in [ROLE_OWNER, ROLE_ADMIN]:
+            customers = Customer.query.filter_by(
+                business_id=current_user.business_id
+            ).all()
+        else:  # Salesperson
             customer_ids = (
                 db.session.query(Debt.customer_id)
                 .filter_by(created_by=current_user_id)
                 .distinct()
             )
-            customers = Customer.query.filter(Customer.id.in_(customer_ids)).all()
+            customers = Customer.query.filter(
+                Customer.id.in_(customer_ids),
+                Customer.business_id == current_user.business_id
+            ).all()
 
         return customers_schema.dump(customers), 200
 
     @jwt_required()
     @role_required(ROLE_OWNER, ROLE_ADMIN)
     def post(self):
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(current_user_id)
+
         data = request.get_json() or {}
         errors = customer_schema.validate(data)
         if errors:
             return jsonify(errors), 400
 
+        # Prevent cross-business creation
+        if data.get("business_id") != current_user.business_id:
+            return jsonify({"message": "Invalid business assignment"}), 403
+
         customer = Customer(
             customer_name=data["customer_name"],
             phone=data["phone"],
             id_number=data["id_number"],
-            business_id=data["business_id"],
-            created_by=get_jwt_identity()
+            business_id=current_user.business_id,
+            created_by=current_user.id
         )
 
         db.session.add(customer)
@@ -77,14 +104,21 @@ class CustomerResource(Resource):
     @jwt_required()
     @role_required(ROLE_OWNER, ROLE_ADMIN)
     def put(self, customer_id):
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(current_user_id)
+
         customer = Customer.query.get_or_404(customer_id)
+
+        if not can_access_customer(current_user, customer):
+            return jsonify({"message": "Access denied"}), 403
+
         data = request.get_json() or {}
         errors = customer_schema.validate(data, partial=True)
         if errors:
             return jsonify(errors), 400
 
         for key, value in data.items():
-            if hasattr(customer, key):
+            if hasattr(customer, key) and key != "business_id":  # prevent reassigning
                 setattr(customer, key, value)
 
         db.session.add(customer)
@@ -97,7 +131,14 @@ class CustomerResource(Resource):
     @jwt_required()
     @role_required(ROLE_OWNER)
     def delete(self, customer_id):
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(current_user_id)
+
         customer = Customer.query.get_or_404(customer_id)
+
+        if not can_access_customer(current_user, customer):
+            return jsonify({"message": "Access denied"}), 403
+
         log_change("Customer", customer.id, "delete", customer_schema.dump(customer))
         db.session.delete(customer)
         db.session.commit()
