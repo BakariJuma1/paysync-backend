@@ -32,7 +32,6 @@ class BusinessSchema(ma.SQLAlchemyAutoSchema):
 # For creating/updating
 class BusinessCreateUpdateSchema(ma.SQLAlchemySchema):
     name = fields.String(required=True)
-    owner_id = fields.Integer(required=True)
     address = fields.String(required=False, allow_none=True)
     phone = fields.String(required=False, allow_none=True)
     email = fields.String(required=False, allow_none=True)
