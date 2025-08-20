@@ -90,16 +90,21 @@ class DebtResource(Resource):
 
         # --- Add items ---
         for item_data in data.get("items", []):
+            # Handle category field - provide default if not present
+            category = item_data.get("category")
+            if category is None:
+                category = "Uncategorized"  # Default value
+                
             db.session.add(Item(
                 debt_id=debt.id,
                 name=item_data.get("name"),
                 quantity=item_data.get("quantity", 1),
-                price=item_data.get("price", 0)
+                price=item_data.get("price", 0),
+                category=category  # Add category field
             ))
 
         debt.calculate_total()
         
-
         db.session.commit()
         return debt_schema.dump(debt), 201
 
@@ -133,17 +138,24 @@ class DebtResource(Resource):
 
             for item_data in items_data:
                 item_id = item_data.get("id")
+                # Handle category field - provide default if not present
+                category = item_data.get("category")
+                if category is None:
+                    category = "Uncategorized"  # Default value
+                    
                 if item_id and item_id in existing_items:
                     item = existing_items[item_id]
                     item.name = item_data.get("name", item.name)
                     item.quantity = item_data.get("quantity", item.quantity)
                     item.price = item_data.get("price", item.price)
+                    item.category = category  # Update category
                 else:
                     db.session.add(Item(
                         debt_id=debt.id,
                         name=item_data.get("name"),
                         quantity=item_data.get("quantity", 1),
-                        price=item_data.get("price", 0)
+                        price=item_data.get("price", 0),
+                        category=category  # Add category field
                     ))
 
             if data.get("remove_missing_items", False):
