@@ -2,7 +2,7 @@ from flask import request
 from flask_restful import Resource, Api
 from werkzeug.security import generate_password_hash
 from flask_jwt_extended import create_access_token
-from datetime import datetime
+from datetime import datetime,timedelta
 
 from server.models import db, User, Invitation
 from server.utils.roles import ALL_ROLES
@@ -16,8 +16,6 @@ def make_response(data, code=200):
     if isinstance(data, (dict, list)):
         return data, code
     return {"message": str(data)}, code
-
-
 class AcceptInvite(Resource):
     def post(self):
         try:
@@ -36,7 +34,6 @@ class AcceptInvite(Resource):
             if invitation.expires_at < datetime.utcnow():
                 return make_response({"message": "Invitation token has expired"}, 400)
 
-            # Validate role from invitation
             if invitation.role not in ALL_ROLES:
                 return make_response({"message": "Invalid role in invitation"}, 400)
 
@@ -56,13 +53,18 @@ class AcceptInvite(Resource):
                 created_at=datetime.utcnow()
             )
             db.session.add(new_user)
-
-            # Remove the invitation
             db.session.delete(invitation)
             db.session.commit()
 
-            # Create access token
-            access_token = create_access_token(identity=new_user.id)
+            # Create access token with same structure as Login
+            access_token = create_access_token(
+                identity=new_user.id,
+                expires_delta=timedelta(hours=1),
+                additional_claims={
+                    "role": new_user.role,
+                    "business_id": new_user.business_id
+                }
+            )
 
             return make_response({
                 "message": "Account created successfully",
@@ -74,7 +76,8 @@ class AcceptInvite(Resource):
                     "role": new_user.role,
                     "is_verified": True,
                     "business_id": new_user.business_id,
-                }
+                },
+                "has_business": bool(new_user.business_id),
             }, 201)
 
         except Exception as e:
