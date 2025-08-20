@@ -53,9 +53,9 @@ class PaymentResource(Resource):
 
         db.session.add(payment)
 
-        # update debt balance
+        # update debt status
         debt.amount_paid += payment.amount
-        debt.update_balance()
+        debt.update_status()
 
         db.session.commit()
 
@@ -69,7 +69,7 @@ class PaymentResource(Resource):
         # Reverse effect on debt before delete
         if payment.debt:
             payment.debt.amount_paid -= payment.amount
-            payment.debt.update_balance()
+            payment.debt.update_status()
 
         log_change("Payment", payment.id, "delete", payment_schema.dump(payment))
 
@@ -97,7 +97,7 @@ class PaymentResource(Resource):
             if payment.debt:
                 payment.debt.amount_paid -= old_amount
                 payment.debt.amount_paid += new_amount
-                payment.debt.update_balance()
+                payment.debt.update_status()
 
             payment.amount = new_amount
 

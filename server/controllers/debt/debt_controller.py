@@ -172,7 +172,7 @@ class DebtResource(Resource):
                         db.session.delete(item)
 
         debt.calculate_total()
-        debt.update_balance()
+        debt.update_status()
 
         db.session.commit()
         
