@@ -9,6 +9,7 @@ from server.schemas.debt_schema import DebtSchema
 from server.utils.change_logger import log_change
 from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON
 from server.utils.decorators import role_required
+from sqlalchemy.orm import joinedload
 
 api = Api(debt_bp)
 
@@ -24,15 +25,18 @@ class DebtResource(Resource):
         current_user = g.current_user
 
         if debt_id:
-            debt = Debt.query.get_or_404(debt_id)
+            # Use eager loading to include customer relationship
+            debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
             if current_user.role == ROLE_SALESPERSON and debt.created_by != current_user.id:
                 return {"message": "Access denied"}, 403
             return debt_schema.dump(debt), 200
 
         if current_user.role in [ROLE_OWNER, ROLE_ADMIN]:
-            debts = Debt.query.all()
+            # Use eager loading to include customer relationship
+            debts = Debt.query.options(joinedload(Debt.customer)).all()
         else:  
-            debts = Debt.query.filter_by(created_by=current_user.id).all()
+            # Use eager loading to include customer relationship
+            debts = Debt.query.options(joinedload(Debt.customer)).filter_by(created_by=current_user.id).all()
 
         return debts_schema.dump(debts), 200
 
@@ -41,7 +45,7 @@ class DebtResource(Resource):
         data = request.get_json() or {}
         current_user = g.current_user
 
-        #  Handle customer creation or lookup 
+        # Handle customer creation or lookup 
         customer_id = data.get("customer_id")
         if not customer_id:
             required_fields = ["customer_name", "phone", "id_number", "business_id"]
@@ -69,7 +73,7 @@ class DebtResource(Resource):
         else:
             customer = Customer.query.get_or_404(customer_id)
 
-        #  Handle due date 
+        # Handle due date 
         due_date = None
         if data.get("due_date"):
             try:
@@ -86,9 +90,7 @@ class DebtResource(Resource):
         db.session.add(debt)
         db.session.flush()
 
-        log_change("Debt", debt.id, "create", debt_schema.dump(debt))
-
-        # --- Add items ---
+        # Add items
         for item_data in data.get("items", []):
             # Handle category field - provide default if not present
             category = item_data.get("category")
@@ -106,11 +108,17 @@ class DebtResource(Resource):
         debt.calculate_total()
         
         db.session.commit()
-        return debt_schema.dump(debt), 201
+        
+        # Reload the debt with customer relationship for proper serialization
+        debt_with_customer = Debt.query.options(joinedload(Debt.customer)).get(debt.id)
+        log_change("Debt", debt.id, "create", debt_schema.dump(debt_with_customer))
+        
+        return debt_schema.dump(debt_with_customer), 201
 
     @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def put(self, debt_id):
-        debt = Debt.query.get_or_404(debt_id)
+        # Use eager loading to include customer relationship
+        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
         current_user = g.current_user
 
         if current_user.role == ROLE_SALESPERSON and debt.created_by != current_user.id:
@@ -118,7 +126,7 @@ class DebtResource(Resource):
 
         data = request.get_json() or {}
 
-        # --- Update core fields ---
+        # Update core fields
         if "customer_id" in data:
             debt.customer_id = data["customer_id"]
 
@@ -131,31 +139,30 @@ class DebtResource(Resource):
         if "amount_paid" in data:
             debt.amount_paid = data["amount_paid"]
 
-        # --- Update items ---
+        # Update items
         items_data = data.get("items")
         if items_data is not None:
             existing_items = {item.id: item for item in debt.items}
 
             for item_data in items_data:
                 item_id = item_data.get("id")
-                # Handle category field - provide default if not present
                 category = item_data.get("category")
                 if category is None:
-                    category = "Uncategorized"  # Default value
+                    category = "Uncategorized"  
                     
                 if item_id and item_id in existing_items:
                     item = existing_items[item_id]
                     item.name = item_data.get("name", item.name)
                     item.quantity = item_data.get("quantity", item.quantity)
                     item.price = item_data.get("price", item.price)
-                    item.category = category  # Update category
+                    item.category = category  
                 else:
                     db.session.add(Item(
                         debt_id=debt.id,
                         name=item_data.get("name"),
                         quantity=item_data.get("quantity", 1),
                         price=item_data.get("price", 0),
-                        category=category  # Add category field
+                        category=category  
                     ))
 
             if data.get("remove_missing_items", False):
@@ -167,15 +174,18 @@ class DebtResource(Resource):
         debt.calculate_total()
         debt.update_balance()
 
-        log_change("Debt", debt.id, "update", debt_schema.dump(debt))
         db.session.commit()
+        
+        
+        updated_debt = Debt.query.options(joinedload(Debt.customer)).get(debt_id)
+        log_change("Debt", debt.id, "update", debt_schema.dump(updated_debt))
 
-        return debt_schema.dump(debt), 200
+        return debt_schema.dump(updated_debt), 200
 
     
     @role_required(ROLE_OWNER)
     def delete(self, debt_id):
-        debt = Debt.query.get_or_404(debt_id)
+        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
         current_user = g.current_user
 
         if current_user.role != ROLE_OWNER:
