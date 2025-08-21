@@ -30,3 +30,4 @@ class Business(db.Model):
         overlaps="business"
     )
     customers = db.relationship("Customer", back_populates="business", cascade="all, delete-orphan")
+    debts = db.relationship("Debt", back_populates="business", cascade="all, delete-orphan")

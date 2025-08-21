@@ -9,6 +9,7 @@ class Debt(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id', ondelete='CASCADE'), nullable=False)
+    business_id = db.Column(db.Integer, db.ForeignKey("businesses.id"), nullable=False)  
     total = db.Column(db.Float, nullable=False, default=0)
     amount_paid = db.Column(db.Float, nullable=False, default=0)
     due_date = db.Column(db.DateTime)
@@ -26,6 +27,7 @@ class Debt(db.Model):
     created_by_user = db.relationship("User", back_populates="debts")
     items = db.relationship("Item", back_populates="debt", cascade="all, delete-orphan")
     payments = db.relationship("Payment", back_populates="debt", cascade="all, delete-orphan")
+    business = db.relationship("Business", back_populates="debts")
     
     def calculate_total(self):
         self.total = sum(item.total_price for item in self.items)
