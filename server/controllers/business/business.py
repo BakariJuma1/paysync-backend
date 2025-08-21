@@ -1,4 +1,4 @@
-from flask import request, jsonify
+from flask import request, g
 from flask_restful import Resource, Api
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy.exc import SQLAlchemyError
@@ -17,25 +17,30 @@ businesses_schema = BusinessSchema(many=True)
 business_create_update_schema = BusinessCreateUpdateSchema()
 
 
-@business_bp.route('/business/my', methods=['GET'])
-@jwt_required()
-@role_required(*ALL_ROLES)
-def get_my_business():
-    current_user = User.query.get_or_404(get_jwt_identity())
+# ---------------------------
+# /business/my
+# ---------------------------
+class MyBusinessResource(Resource):
+    @jwt_required()
+    @role_required(*ALL_ROLES)
+    def get(self):
+        current_user = User.query.get_or_404(get_jwt_identity())
 
-    if current_user.role == ROLE_OWNER:
-        business = Business.query.filter_by(owner_id=current_user.id).first()
-    else:
-        business = Business.query.get(current_user.business_id) if current_user.business_id else None
+        if current_user.role == ROLE_OWNER:
+            business = Business.query.filter_by(owner_id=current_user.id).first()
+        else:
+            business = Business.query.get(current_user.business_id) if current_user.business_id else None
 
-    if not business:
-        return jsonify({"message": "No business found"}), 404
+        if not business:
+            return {"message": "No business found"}, 404
 
-    return  business_schema.dump(business), 200
+        return {"business": business_schema.dump(business)}, 200
 
 
+# ---------------------------
+# /businesses and /businesses/<id>
+# ---------------------------
 class BusinessResource(Resource):
-
     @jwt_required()
     @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def get(self, business_id=None):
@@ -44,20 +49,21 @@ class BusinessResource(Resource):
         if business_id:
             business = Business.query.get_or_404(business_id)
 
-            # Restrict access if not owner of that business
+            # Restrict access if not owner/admin/salesperson
             if current_user.role in (ROLE_ADMIN, ROLE_SALESPERSON) and business.id != current_user.business_id:
                 return {"message": "Access denied"}, 403
 
-            return business_schema.dump(business), 200
+            return {"business": business_schema.dump(business)}, 200
 
-        # List view by role
+        # List all businesses visible to user
         if current_user.role == ROLE_OWNER:
-            return businesses_schema.dump(current_user.owned_businesses), 200
+            businesses = current_user.owned_businesses
+        elif current_user.business_id:
+            businesses = [Business.query.get(current_user.business_id)]
+        else:
+            businesses = []
 
-        if current_user.business_id:
-            return businesses_schema.dump([Business.query.get(current_user.business_id)]), 200
-
-        return [], 200
+        return {"businesses": businesses_schema.dump(businesses)}, 200
 
     @jwt_required()
     @role_required(ROLE_OWNER)
@@ -65,7 +71,6 @@ class BusinessResource(Resource):
         current_user_id = get_jwt_identity()
         json_data = request.get_json() or {}
 
-        # Validate incoming data
         errors = business_create_update_schema.validate(json_data)
         if errors:
             return {"errors": errors}, 400
@@ -84,10 +89,7 @@ class BusinessResource(Resource):
             db.session.commit()
             db.session.refresh(business)
 
-            return {
-                "business": business_schema.dump(business),
-                "message": "Business created successfully"
-            }, 201
+            return {"business": business_schema.dump(business), "message": "Business created successfully"}, 201
 
         except SQLAlchemyError as e:
             db.session.rollback()
@@ -107,12 +109,15 @@ class BusinessResource(Resource):
         if errors:
             return {"errors": errors}, 400
 
-        for field, value in json_data.items():
-            setattr(business, field, value)
+        # Only allow safe fields to be updated
+        updatable_fields = ["name", "address", "phone", "email", "website", "description"]
+        for field in updatable_fields:
+            if field in json_data:
+                setattr(business, field, json_data[field])
 
         try:
             db.session.commit()
-            return business_schema.dump(business), 200
+            return {"business": business_schema.dump(business), "message": "Business updated successfully"}, 200
         except SQLAlchemyError as e:
             db.session.rollback()
             return {"message": "Database error", "details": str(e)}, 422
@@ -135,4 +140,8 @@ class BusinessResource(Resource):
             return {"message": "Database error", "details": str(e)}, 422
 
 
-api.add_resource(BusinessResource, '/businesses', '/businesses/<int:business_id>')
+# ---------------------------
+# Register resources
+# ---------------------------
+api.add_resource(MyBusinessResource, "/business/my")
+api.add_resource(BusinessResource, "/businesses", "/businesses/<int:business_id>")
