@@ -1,7 +1,6 @@
 from flask_restful import Resource, Api
-from flask import request, jsonify, g
-from flask_jwt_extended import jwt_required
-from server.models import Debt, User, Item, Customer
+from flask import request, g
+from server.models import Debt, Customer, Item
 from server.extension import db
 from datetime import datetime
 from . import debt_bp
@@ -18,19 +17,17 @@ debt_schema = DebtSchema()
 debts_schema = DebtSchema(many=True)
 
 
-# -------------------------------------------
+# ---------------------------
 # Access Control Helper
-# -------------------------------------------
+# ---------------------------
 def can_access_debt(user, debt):
     """
-    Restrict all roles to their business only.
-    - Admins: all debts in their business
-    - Owners: all debts in their business
-    - Salespersons: only debts they created in their business
+    Restrict access to debts within the user's business.
+    - Admins & Owners: all debts in their business
+    - Salespersons: only debts they created
     """
     if not debt.customer or debt.customer.business_id != user.business_id:
         return False
-
     if user.role in [ROLE_ADMIN, ROLE_OWNER]:
         return True
     if user.role == ROLE_SALESPERSON:
@@ -50,39 +47,34 @@ class DebtResource(Resource):
                 return {"message": "Access denied"}, 403
             return debt_schema.dump(debt), 200
 
-        # Collection fetch
-        if current_user.role in [ROLE_ADMIN, ROLE_OWNER]:
-            debts = Debt.query.options(joinedload(Debt.customer))\
-                .join(Customer)\
-                .filter(Customer.business_id == current_user.business_id).all()
-        else:  # salesperson
-            debts = Debt.query.options(joinedload(Debt.customer))\
-                .join(Customer)\
-                .filter(Customer.business_id == current_user.business_id,
-                        Debt.created_by == current_user.id).all()
+        # Fetch all debts for the user's business
+        query = Debt.query.options(joinedload(Debt.customer))\
+                    .join(Customer)\
+                    .filter(Customer.business_id == current_user.business_id)
 
+        if current_user.role == ROLE_SALESPERSON:
+            query = query.filter(Debt.created_by == current_user.id)
+
+        debts = query.all()
         return debts_schema.dump(debts), 200
 
     @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def post(self):
         data = request.get_json() or {}
         current_user = g.current_user
+        business_id = current_user.business_id
 
-        # Restrict creation to current user's business
-        if data.get("business_id") != current_user.business_id:
-            return {"message": "You cannot create debts for another business"}, 403
-
-        # Handle customer creation or lookup 
+        # Handle customer creation or lookup
         customer_id = data.get("customer_id")
         if not customer_id:
-            required_fields = ["customer_name", "phone", "id_number", "business_id"]
+            required_fields = ["customer_name", "phone", "id_number"]
             if not all(data.get(field) for field in required_fields):
                 return {"message": "Customer details are required if customer_id is not provided"}, 400
 
             customer = Customer.query.filter_by(
                 customer_name=data["customer_name"],
                 phone=data["phone"],
-                business_id=data["business_id"]
+                business_id=business_id
             ).first()
 
             if not customer:
@@ -90,7 +82,7 @@ class DebtResource(Resource):
                     customer_name=data["customer_name"],
                     phone=data["phone"],
                     id_number=data["id_number"],
-                    business_id=data["business_id"],
+                    business_id=business_id,
                     created_by=current_user.id
                 )
                 db.session.add(customer)
@@ -99,11 +91,10 @@ class DebtResource(Resource):
             customer_id = customer.id
         else:
             customer = Customer.query.get_or_404(customer_id)
-            # Enforce same business
-            if customer.business_id != current_user.business_id:
+            if customer.business_id != business_id:
                 return {"message": "Access denied"}, 403
 
-        # Handle due date 
+        # Handle due date
         due_date = None
         if data.get("due_date"):
             try:
@@ -113,20 +104,21 @@ class DebtResource(Resource):
 
         debt = Debt(
             customer_id=customer_id,
+            business_id=business_id,
             due_date=due_date,
             created_by=current_user.id
         )
         db.session.add(debt)
         db.session.flush()
 
+        # Add items
         for item_data in data.get("items", []):
-            category = item_data.get("category") or "Uncategorized"
             db.session.add(Item(
                 debt_id=debt.id,
                 name=item_data.get("name"),
                 quantity=item_data.get("quantity", 1),
                 price=item_data.get("price", 0),
-                category=category
+                category=item_data.get("category") or "Uncategorized"
             ))
 
         debt.calculate_total()
@@ -139,27 +131,29 @@ class DebtResource(Resource):
 
     @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def put(self, debt_id):
-        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
         current_user = g.current_user
+        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
 
         if not can_access_debt(current_user, debt):
             return {"message": "Access denied"}, 403
 
         data = request.get_json() or {}
 
-        # Update core fields
+        # Update customer
         if "customer_id" in data:
             new_customer = Customer.query.get_or_404(data["customer_id"])
             if new_customer.business_id != current_user.business_id:
                 return {"message": "Access denied"}, 403
-            debt.customer_id = data["customer_id"]
+            debt.customer_id = new_customer.id
 
+        # Update due date
         if "due_date" in data:
             try:
                 debt.due_date = datetime.strptime(data["due_date"], "%Y-%m-%d")
             except ValueError:
                 return {"message": "due_date must be YYYY-MM-DD format"}, 400
 
+        # Update amount_paid
         if "amount_paid" in data:
             debt.amount_paid = data["amount_paid"]
 
@@ -170,23 +164,22 @@ class DebtResource(Resource):
 
             for item_data in items_data:
                 item_id = item_data.get("id")
-                category = item_data.get("category") or "Uncategorized"
-
                 if item_id and item_id in existing_items:
                     item = existing_items[item_id]
                     item.name = item_data.get("name", item.name)
                     item.quantity = item_data.get("quantity", item.quantity)
                     item.price = item_data.get("price", item.price)
-                    item.category = category
+                    item.category = item_data.get("category") or "Uncategorized"
                 else:
                     db.session.add(Item(
                         debt_id=debt.id,
                         name=item_data.get("name"),
                         quantity=item_data.get("quantity", 1),
                         price=item_data.get("price", 0),
-                        category=category
+                        category=item_data.get("category") or "Uncategorized"
                     ))
 
+            # Optionally remove missing items
             if data.get("remove_missing_items", False):
                 payload_ids = {item.get("id") for item in items_data if item.get("id")}
                 for item in list(debt.items):
@@ -199,13 +192,12 @@ class DebtResource(Resource):
 
         updated_debt = Debt.query.options(joinedload(Debt.customer)).get(debt_id)
         log_change("Debt", debt.id, "update", debt_schema.dump(updated_debt))
-
         return debt_schema.dump(updated_debt), 200
 
     @role_required(ROLE_OWNER, ROLE_ADMIN)
     def delete(self, debt_id):
-        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
         current_user = g.current_user
+        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
 
         if not can_access_debt(current_user, debt):
             return {"message": "Access denied"}, 403
@@ -213,7 +205,6 @@ class DebtResource(Resource):
         log_change("Debt", debt.id, "delete", debt_schema.dump(debt))
         db.session.delete(debt)
         db.session.commit()
-
         return {"message": f"Debt {debt_id} deleted"}, 200
 
 
