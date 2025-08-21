@@ -47,9 +47,9 @@ class DebtResource(Resource):
                 return {"message": "Access denied"}, 403
             return debt_schema.dump(debt), 200
 
-        # Fetch all debts for the user's business
-        query = Debt.query.options(joinedload(Debt.customer))\
-                    .join(Customer)\
+        # Fetch all debts for user's business
+        query = Debt.query.options(joinedload(Debt.customer)) \
+                    .join(Customer) \
                     .filter(Customer.business_id == current_user.business_id)
 
         if current_user.role == ROLE_SALESPERSON:
@@ -63,6 +63,9 @@ class DebtResource(Resource):
         data = request.get_json() or {}
         current_user = g.current_user
         business_id = current_user.business_id
+
+        if not business_id:
+            return {"message": "Current user is not linked to a business"}, 400
 
         # Handle customer creation or lookup
         customer_id = data.get("customer_id")
@@ -86,7 +89,7 @@ class DebtResource(Resource):
                     created_by=current_user.id
                 )
                 db.session.add(customer)
-                db.session.flush()
+                db.session.flush()  # get the ID without committing
 
             customer_id = customer.id
         else:
@@ -102,6 +105,7 @@ class DebtResource(Resource):
             except ValueError:
                 return {"message": "due_date must be YYYY-MM-DD format"}, 400
 
+        # Create debt
         debt = Debt(
             customer_id=customer_id,
             business_id=business_id,
@@ -179,7 +183,6 @@ class DebtResource(Resource):
                         category=item_data.get("category") or "Uncategorized"
                     ))
 
-            # Optionally remove missing items
             if data.get("remove_missing_items", False):
                 payload_ids = {item.get("id") for item in items_data if item.get("id")}
                 for item in list(debt.items):
