@@ -1,5 +1,5 @@
 from flask_restful import Resource, Api
-from flask import request, jsonify, g
+from flask import request, g
 from flask_jwt_extended import jwt_required
 from datetime import datetime
 from server.extension import db

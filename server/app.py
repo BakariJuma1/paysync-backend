@@ -1,4 +1,4 @@
-from flask import Flask,jsonify
+from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api
 from dotenv import load_dotenv
@@ -63,7 +63,7 @@ def create_app():
     @app.errorhandler(Exception)
     def handle_error(e):
         app.logger.error(f"Unhandled error: {e}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
     
     @app.route('/')

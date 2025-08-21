@@ -1,6 +1,6 @@
 from functools import wraps
 from flask_jwt_extended import get_jwt, verify_jwt_in_request, get_jwt_identity
-from flask import jsonify, g
+from flask import g
 from server.models import User
 from .roles import ROLE_SALESPERSON, ROLE_ADMIN, ROLE_OWNER, ALL_ROLES
 
@@ -24,12 +24,12 @@ def role_required(*roles):
             # Fetch user from DB and attach to g
             user = User.query.get(user_id)
             if not user:
-                return jsonify({"message": "User not found"}), 404
+                return {"message": "User not found"}, 404
             g.current_user = user
 
             # Role check
             if user_role not in allowed_roles:
-                return jsonify({"message": "Forbidden: Insufficient permissions"}), 403
+                return {"message": "Forbidden: Insufficient permissions"}, 403
 
             return fn(*args, **kwargs)
         return decorator
