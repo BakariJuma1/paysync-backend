@@ -27,14 +27,11 @@ class MyBusinessResource(Resource):
         current_user = User.query.get_or_404(get_jwt_identity())
 
         if current_user.role == ROLE_OWNER:
-            business = Business.query.filter_by(owner_id=current_user.id).first()
+            businesses = Business.query.filter_by(owner_id=current_user.id).all()
         else:
-            business = Business.query.get(current_user.business_id) if current_user.business_id else None
+            businesses = [Business.query.get(current_user.business_id)] if current_user.business_id else []
 
-        if not business:
-            return {"message": "No business found"}, 404
-
-        return {"business": business_schema.dump(business)}, 200
+        return {"businesses": businesses_schema.dump(businesses)}, 200
 
 
 # ---------------------------
@@ -57,7 +54,7 @@ class BusinessResource(Resource):
 
         # List all businesses visible to user
         if current_user.role == ROLE_OWNER:
-            businesses = current_user.owned_businesses
+            businesses = Business.query.filter_by(owner_id=current_user.id).all()
         elif current_user.business_id:
             businesses = [Business.query.get(current_user.business_id)]
         else:
@@ -68,7 +65,7 @@ class BusinessResource(Resource):
     @jwt_required()
     @role_required(ROLE_OWNER)
     def post(self):
-        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(get_jwt_identity())
         json_data = request.get_json() or {}
 
         errors = business_create_update_schema.validate(json_data)
@@ -78,7 +75,7 @@ class BusinessResource(Resource):
         try:
             business = Business(
                 name=json_data['name'].strip(),
-                owner_id=current_user_id,
+                owner_id=current_user.id,
                 address=json_data.get('address'),
                 phone=json_data.get('phone'),
                 email=json_data.get('email'),
@@ -89,7 +86,14 @@ class BusinessResource(Resource):
             db.session.commit()
             db.session.refresh(business)
 
-            return {"business": business_schema.dump(business), "message": "Business created successfully"}, 201
+            # Update current_user.business_id if needed
+            current_user.business_id = business.id
+            db.session.commit()
+
+            return {
+                "business": business_schema.dump(business),
+                "message": "Business created successfully"
+            }, 201
 
         except SQLAlchemyError as e:
             db.session.rollback()
@@ -98,10 +102,10 @@ class BusinessResource(Resource):
     @jwt_required()
     @role_required(ROLE_OWNER)
     def put(self, business_id):
-        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(get_jwt_identity())
         business = Business.query.get_or_404(business_id)
 
-        if business.owner_id != current_user_id:
+        if business.owner_id != current_user.id:
             return {"message": "Only the business owner can modify this business"}, 403
 
         json_data = request.get_json() or {}
@@ -125,10 +129,10 @@ class BusinessResource(Resource):
     @jwt_required()
     @role_required(ROLE_OWNER)
     def delete(self, business_id):
-        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(get_jwt_identity())
         business = Business.query.get_or_404(business_id)
 
-        if business.owner_id != current_user_id:
+        if business.owner_id != current_user.id:
             return {"message": "Only the business owner can delete this business"}, 403
 
         try:
