@@ -1,4 +1,3 @@
-# server/tasks/finance_reminders.py
 from datetime import datetime, timedelta
 import logging
 from sqlalchemy import and_
