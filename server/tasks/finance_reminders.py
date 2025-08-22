@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 from sqlalchemy import and_
-from server import db, create_app
+from server.extension import db
 from server.models import Debt, Customer, Business, FinanceSettings
 from server.service.finance_reminders import send_payment_reminder_email
 from server.utils.reminders import should_send_today_qexpr, log_reminder
