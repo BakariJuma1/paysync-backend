@@ -113,8 +113,8 @@ class OwnerDashboard(Resource):
         
         top_debtors = [
             {
-                "customer": customer.customer_name,
-                "phone": customer.phone,
+                "customer": customer,
+                "phone": phone,
                 "amount": float(total_balance),
                 "status": status
             }
