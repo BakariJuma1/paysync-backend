@@ -23,15 +23,20 @@ debts_schema = DebtSchema(many=True)
 def can_access_debt(user, debt):
     """
     Restrict access to debts within the user's business.
-    - Admins & Owners: all debts in their business
+    - Owners: all debts in their business
+    - Admins: all debts in their business (including salesperson debts)
     - Salespersons: only debts they created
     """
+    # First check if debt belongs to the user's business
     if not debt.customer or debt.customer.business_id != user.business_id:
         return False
-    if user.role in [ROLE_ADMIN, ROLE_OWNER]:
+    
+    # Access control based on role
+    if user.role in [ROLE_OWNER, ROLE_ADMIN]:
         return True
     if user.role == ROLE_SALESPERSON:
         return debt.created_by == user.id
+    
     return False
 
 
@@ -42,20 +47,29 @@ class DebtResource(Resource):
         current_user = g.current_user
 
         if debt_id:
-            debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
+            # Get debt with proper joins to check access
+            debt = Debt.query.options(
+                joinedload(Debt.customer),
+                joinedload(Debt.created_by_user)  # Join the user who created the debt
+            ).get_or_404(debt_id)
+            
             if not can_access_debt(current_user, debt):
                 return {"message": "Access denied"}, 403
             return debt_schema.dump(debt), 200
 
-        # Fetch all debts for user's business
-        query = Debt.query.options(joinedload(Debt.customer)) \
-                    .join(Customer) \
-                    .filter(Customer.business_id == current_user.business_id)
+        # Fetch all debts for user's business with proper filtering
+        query = Debt.query.options(
+            joinedload(Debt.customer),
+            joinedload(Debt.created_by_user)  # Include creator information
+        ).join(Customer).filter(Customer.business_id == current_user.business_id)
 
+        # Salespeople can only see their own debts
         if current_user.role == ROLE_SALESPERSON:
             query = query.filter(Debt.created_by == current_user.id)
 
-        debts = query.all()
+        # For owners and admins, no additional filtering needed - they see all
+        debts = query.order_by(Debt.created_at.desc()).all()
+        
         return debts_schema.dump(debts), 200
 
     @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
@@ -105,12 +119,16 @@ class DebtResource(Resource):
             except ValueError:
                 return {"message": "due_date must be YYYY-MM-DD format"}, 400
 
+        # Handle category
+        category = data.get("category", "Uncategorized")
+
         # Create debt
         debt = Debt(
             customer_id=customer_id,
             business_id=business_id,
             due_date=due_date,
-            created_by=current_user.id
+            created_by=current_user.id,
+            category=category
         )
         db.session.add(debt)
         db.session.flush()
@@ -122,13 +140,17 @@ class DebtResource(Resource):
                 name=item_data.get("name"),
                 quantity=item_data.get("quantity", 1),
                 price=item_data.get("price", 0),
-                category=item_data.get("category") or "Uncategorized"
+                category=item_data.get("category") or category
             ))
 
         debt.calculate_total()
         db.session.commit()
 
-        debt_with_customer = Debt.query.options(joinedload(Debt.customer)).get(debt.id)
+        debt_with_customer = Debt.query.options(
+            joinedload(Debt.customer),
+            joinedload(Debt.created_by_user)
+        ).get(debt.id)
+        
         log_change("Debt", debt.id, "create", debt_schema.dump(debt_with_customer))
 
         return debt_schema.dump(debt_with_customer), 201
@@ -136,7 +158,10 @@ class DebtResource(Resource):
     @role_required(ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON)
     def put(self, debt_id):
         current_user = g.current_user
-        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
+        debt = Debt.query.options(
+            joinedload(Debt.customer),
+            joinedload(Debt.created_by_user)
+        ).get_or_404(debt_id)
 
         if not can_access_debt(current_user, debt):
             return {"message": "Access denied"}, 403
@@ -157,6 +182,10 @@ class DebtResource(Resource):
             except ValueError:
                 return {"message": "due_date must be YYYY-MM-DD format"}, 400
 
+        # Update category
+        if "category" in data:
+            debt.category = data["category"]
+
         # Update amount_paid
         if "amount_paid" in data:
             debt.amount_paid = data["amount_paid"]
@@ -173,14 +202,14 @@ class DebtResource(Resource):
                     item.name = item_data.get("name", item.name)
                     item.quantity = item_data.get("quantity", item.quantity)
                     item.price = item_data.get("price", item.price)
-                    item.category = item_data.get("category") or "Uncategorized"
+                    item.category = item_data.get("category") or debt.category
                 else:
                     db.session.add(Item(
                         debt_id=debt.id,
                         name=item_data.get("name"),
                         quantity=item_data.get("quantity", 1),
                         price=item_data.get("price", 0),
-                        category=item_data.get("category") or "Uncategorized"
+                        category=item_data.get("category") or debt.category
                     ))
 
             if data.get("remove_missing_items", False):
@@ -190,17 +219,24 @@ class DebtResource(Resource):
                         db.session.delete(item)
 
         debt.calculate_total()
-        debt.update_balance()
+        debt.update_status()  # Update status based on balance
         db.session.commit()
 
-        updated_debt = Debt.query.options(joinedload(Debt.customer)).get(debt_id)
+        updated_debt = Debt.query.options(
+            joinedload(Debt.customer),
+            joinedload(Debt.created_by_user)
+        ).get(debt_id)
+        
         log_change("Debt", debt.id, "update", debt_schema.dump(updated_debt))
         return debt_schema.dump(updated_debt), 200
 
     @role_required(ROLE_OWNER, ROLE_ADMIN)
     def delete(self, debt_id):
         current_user = g.current_user
-        debt = Debt.query.options(joinedload(Debt.customer)).get_or_404(debt_id)
+        debt = Debt.query.options(
+            joinedload(Debt.customer),
+            joinedload(Debt.created_by_user)
+        ).get_or_404(debt_id)
 
         if not can_access_debt(current_user, debt):
             return {"message": "Access denied"}, 403
