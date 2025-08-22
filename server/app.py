@@ -8,6 +8,7 @@ import os
 from datetime import timedelta
 import logging
 from server.seed import seed
+from server.scheduler import init_scheduler
 
 
 load_dotenv()
@@ -48,6 +49,7 @@ def create_app():
     api = Api(app)
     jwt.init_app(app)
     ma.init_app(app)
+    init_scheduler(app)
 
     # with app.app_context():
     #     from flask_migrate import upgrade

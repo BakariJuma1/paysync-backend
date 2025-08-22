@@ -1,0 +1,75 @@
+# server/routes/reminders.py
+from flask_restful import Resource, Api
+from flask import request
+from flask_jwt_extended import get_jwt_identity
+from server.utils.decorators import role_required
+from server.utils.roles import ROLE_OWNER
+from server.models import db, Debt, User, Business
+from server.tasks.finance_reminders import process_business_reminders, _process_before_due, _process_after_due
+from server.utils.reminders import log_reminder
+from server.service.finance_reminders import send_payment_reminder_email
+from datetime import datetime
+from . import reminder_bp
+
+api = Api(reminder_bp)  
+
+class SendSingleReminder(Resource):
+    @role_required(ROLE_OWNER)
+    def post(self, debt_id):
+        user_id = get_jwt_identity()
+        debt = Debt.query.get_or_404(debt_id)
+
+        # Security: ensure the debt belongs to owner’s business
+        owner = User.query.get_or_404(user_id)
+        if debt.business_id != owner.business_id:
+            return {"message": "Not authorized for this debt"}, 403
+
+        business = Business.query.get_or_404(debt.business_id)
+        settings = getattr(business, "finance_settings", None)
+        if not settings:
+            return {"message": "Finance settings missing"}, 400
+
+        reminder_type = "before_due" if (debt.due_date and debt.due_date >= datetime.utcnow()) else "after_due"
+
+        # Build details quickly (reusing logic)
+        balance = float(debt.balance)
+        details = {
+            "debt_id": debt.id,
+            "invoice_number": f"INV-{debt.id:05d}",
+            "due_date": debt.due_date.strftime("%Y-%m-%d") if debt.due_date else None,
+            "amount_due": f"{balance:.2f} {settings.default_currency}",
+            "status": debt.status,
+        }
+        if reminder_type == "before_due":
+            details["days_until_due"] = (debt.due_date - datetime.utcnow()).days if debt.due_date else None
+        else:
+            details["days_overdue"] = (datetime.utcnow() - debt.due_date).days if debt.due_date else None
+
+        ok = send_payment_reminder_email(
+            debt.customer.email, debt.customer.customer_name, business.name, details, reminder_type
+        )
+        if ok:
+            debt.last_reminder_sent = datetime.utcnow()
+            debt.reminder_count = (debt.reminder_count or 0) + 1
+            db.session.add(debt)
+            log_reminder(debt, "email", "manual", "sent", actor_user_id=user_id)
+            db.session.commit()
+            return {"message": f"Reminder sent to {debt.customer.customer_name}"}, 200
+        else:
+            log_reminder(debt, "email", "manual", "failed", actor_user_id=user_id)
+            db.session.commit()
+            return {"message": "Failed to send reminder"}, 502
+
+class RunOwnerBulkReminders(Resource):
+    """Owner clicks 'Run reminders now' for their business only."""
+    @role_required(ROLE_OWNER)
+    def post(self):
+        user_id = get_jwt_identity()
+        owner = User.query.get_or_404(user_id)
+        business = Business.query.get_or_404(owner.business_id)
+        process_business_reminders(business, actor_user_id=user_id)
+        db.session.commit()
+        return {"message": "Reminder job executed for your business"}, 200
+
+api.add_resource(SendSingleReminder, "/reminders/debts/<int:debt_id>")
+api.add_resource(RunOwnerBulkReminders, "/reminders/run")
