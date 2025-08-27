@@ -60,8 +60,8 @@ class SendSingleReminder(Resource):
             db.session.commit()
             return {"message": "Failed to send reminder"}, 502
 
+#Owner clicks 'Run reminders now' for their business only
 class RunOwnerBulkReminders(Resource):
-    """Owner clicks 'Run reminders now' for their business only."""
     @role_required(ROLE_OWNER)
     def post(self):
         user_id = get_jwt_identity()
