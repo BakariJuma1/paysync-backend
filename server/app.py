@@ -90,7 +90,3 @@ def create_app():
     
     return app
 
-app = create_app()FLASK_APP=app.py
-FLASK_DEBUG=True
-FLASK_RUN_PORT=5555
-FLASK_SQLALCHEMY_DATABASE_URI=
