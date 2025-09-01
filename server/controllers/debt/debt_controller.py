@@ -197,7 +197,17 @@ class DebtResource(Resource):
 
         # Update amount_paid
         if "amount_paid" in data:
-            debt.amount_paid = data["amount_paid"]
+            new_payment = data["amount_paid"]
+            if new_payment > 0:
+                from server.models.payment import Payment
+                payment = Payment(
+                    debt_id=debt.id,
+                    amount=new_payment,
+                    method="update",
+                    received_by=current_user.id,
+                    payment_date=datetime.utcnow()
+                )
+                db.session.add(payment)
 
         # Update items
         items_data = data.get("items")
