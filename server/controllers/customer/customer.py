@@ -43,7 +43,7 @@ class CustomerResource(Resource):
             if not can_access_customer(current_user, customer, allow_sales=True):
                 return {"message": "Access denied"}, 403
             debts = Debt.query.filter_by(customer_id=customer.id).all()
-            debts_data = debt_schema.dump(debts)
+            debts_data = debts_schema.dump(debts)
 
             return {
                 "customer": customer_schema.dump(customer), 
