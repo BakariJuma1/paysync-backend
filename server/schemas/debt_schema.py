@@ -30,7 +30,6 @@ class DebtSchema(ma.SQLAlchemyAutoSchema):
     due_date = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")
     last_reminder_sent = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")
 
-    # Add customer info at root level for easy frontend access
     customer_name = fields.Method("get_customer_name", dump_only=True)
     phone = fields.Method("get_customer_phone", dump_only=True)
 

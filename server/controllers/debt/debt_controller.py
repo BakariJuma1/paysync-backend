@@ -144,6 +144,17 @@ class DebtResource(Resource):
             ))
 
         debt.calculate_total()
+        initial_payment = data.get("amount_paid", 0)
+        if initial_payment > 0:
+            from server.models.payment import Payment
+            payment = Payment(
+                debt_id=debt.id,
+                amount=initial_payment,
+                paid_at=datetime.utcnow(),
+                method="initial",
+                created_by=current_user.id
+            )
+            db.session.add(payment)
         db.session.commit()
 
         debt_with_customer = Debt.query.options(
