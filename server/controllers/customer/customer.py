@@ -8,12 +8,14 @@ from . import customer_bp
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON
 from server.utils.change_logger import log_change
+from server.schemas.debt_schema import DebtSchema
 
 api = Api(customer_bp)
 
 customer_schema = CustomerSchema()
 customers_schema = CustomerSchema(many=True)
-
+debt_schema = DebtSchema()
+debts_schema = DebtSchema(many=True)
 
 def can_access_customer(user, customer, allow_sales=False):
     if customer.business_id != user.business_id:
@@ -40,7 +42,13 @@ class CustomerResource(Resource):
             customer = Customer.query.get_or_404(customer_id)
             if not can_access_customer(current_user, customer, allow_sales=True):
                 return {"message": "Access denied"}, 403
-            return {"customer": customer_schema.dump(customer)}, 200
+            debts = Debt.query.filter_by(customer_id=customer.id).all()
+            debts_data = debt_schema.dump(debts)
+
+            return {
+                "customer": customer_schema.dump(customer), 
+                "debts": debts_data
+            }, 200
 
         # List customers
         if current_user.role in [ROLE_OWNER, ROLE_ADMIN]:

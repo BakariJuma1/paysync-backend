@@ -1,5 +1,6 @@
 from marshmallow import Schema, fields, post_load
 from server.models import Customer
+from server.schemas.debt_schema import DebtSchema
 
 class CustomerSchema(Schema):
     id = fields.Int(dump_only=True)
