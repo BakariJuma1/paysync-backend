@@ -150,7 +150,6 @@ class DebtResource(Resource):
                 debt_id=debt.id,
                 amount=initial_payment,
                 method="initial",
-                created_by=current_user.id
             )
             db.session.add(payment)
         db.session.commit()
