@@ -103,8 +103,7 @@ class DebtResource(Resource):
                     created_by=current_user.id
                 )
                 db.session.add(customer)
-                db.session.flush()  # get the ID without committing
-
+                db.session.flush()  
             customer_id = customer.id
         else:
             customer = Customer.query.get_or_404(customer_id)
@@ -150,7 +149,6 @@ class DebtResource(Resource):
             payment = Payment(
                 debt_id=debt.id,
                 amount=initial_payment,
-                paid_at=datetime.utcnow(),
                 method="initial",
                 created_by=current_user.id
             )
