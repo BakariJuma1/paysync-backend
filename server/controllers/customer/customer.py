@@ -49,6 +49,10 @@ class CustomerResource(Resource):
                 "customer": customer_schema.dump(customer), 
                 "debts": debts_data
             }, 200
+        print("Current user ID:", current_user.id)
+        print("Current user role:", current_user.role)
+        print("Current user business_id:", current_user.business_id)
+
 
         # List customers
         if current_user.role in [ROLE_OWNER, ROLE_ADMIN]:
