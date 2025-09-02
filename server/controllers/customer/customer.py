@@ -88,6 +88,7 @@ class CustomerResource(Resource):
             customer_name=data["customer_name"],
             phone=data["phone"],
             id_number=data["id_number"],
+            email=data["email"],
             business_id=current_user.business_id,
             created_by=current_user.id
         )
