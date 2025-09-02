@@ -1,6 +1,7 @@
 from server.extension import ma
 from server.models import Payment
 from marshmallow import fields
+from server.models import User
 
 class PaymentSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
