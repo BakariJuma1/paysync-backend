@@ -30,8 +30,13 @@ class DebtSchema(ma.SQLAlchemyAutoSchema):
     due_date = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")
     last_reminder_sent = ma.DateTime(format="%Y-%m-%dT%H:%M:%S")
 
+    # Flattened customer info
     customer_name = fields.Method("get_customer_name", dump_only=True)
     phone = fields.Method("get_customer_phone", dump_only=True)
+
+    # Add financials
+    amount_paid = fields.Float(dump_only=True)
+    balance = fields.Float(dump_only=True)
 
     def get_customer_name(self, obj):
         return obj.customer.customer_name if obj.customer else None
