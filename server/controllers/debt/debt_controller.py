@@ -99,6 +99,7 @@ class DebtResource(Resource):
                     customer_name=data["customer_name"],
                     phone=data["phone"],
                     id_number=data["id_number"],
+                    email=data.get("email"),
                     business_id=business_id,
                     created_by=current_user.id
                 )
@@ -183,6 +184,10 @@ class DebtResource(Resource):
             if new_customer.business_id != current_user.business_id:
                 return {"message": "Access denied"}, 403
             debt.customer_id = new_customer.id
+
+        # update customer email 
+        if "email" in data and debt.customer:
+            debt.customer.email = data["email"]
 
         # Update due date
         if "due_date" in data:
