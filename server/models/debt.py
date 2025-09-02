@@ -11,7 +11,6 @@ class Debt(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id', ondelete='CASCADE'), nullable=False)
     business_id = db.Column(db.Integer, db.ForeignKey("businesses.id"), nullable=False)  
     total = db.Column(db.Float, nullable=False, default=0)
-    amount_paid = db.Column(db.Float, nullable=False, default=0)
     due_date = db.Column(db.DateTime)
     status = db.Column(db.String, default='partial')
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
@@ -32,6 +31,19 @@ class Debt(db.Model):
     def calculate_total(self):
         self.total = sum(item.total_price for item in self.items)
         return self.total
+    
+    @hybrid_property
+    def amount_paid(self):
+        return sum(payment.amount for payment in self.payments)
+    
+    @amount_paid.expression
+    def amount_paid(cls):
+        return(  
+            select(func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.debt_id == cls.id)
+            .scalar_subquery()
+        )
+    
     
     # Hybrid property for balance
     @hybrid_property

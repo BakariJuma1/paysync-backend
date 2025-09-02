@@ -237,7 +237,7 @@ class DebtResource(Resource):
                     if item.id not in payload_ids:
                         db.session.delete(item)
 
-        debt.session.flush()
+        db.session.flush()
         debt.calculate_total()
         debt.update_status()  # Update status based on balance
         db.session.commit()
