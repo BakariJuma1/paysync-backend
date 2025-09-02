@@ -39,3 +39,4 @@ class BusinessCreateUpdateSchema(ma.SQLAlchemySchema):
     email = fields.String(required=False, allow_none=True)
     website = fields.String(required=False, allow_none=True)
     description = fields.String(required=False, allow_none=True)
+    finance_settings = fields.Dict(required=False, allow_none=True)

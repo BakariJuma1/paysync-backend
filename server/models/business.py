@@ -14,6 +14,7 @@ class Business(db.Model):
     website = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
 
     # Relationships
     owner = db.relationship(

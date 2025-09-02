@@ -8,6 +8,7 @@ from . import business_bp
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON, ALL_ROLES
 from server.schemas.business_schema import BusinessSchema, BusinessCreateUpdateSchema
+from server.models import FinanceSettings
 
 api = Api(business_bp)
 
@@ -83,7 +84,10 @@ class BusinessResource(Resource):
                 description=json_data.get('description')
             )
             db.session.add(business)
-            db.session.commit()
+            db.session.flush()
+            
+            finance_settings = FinanceSettings(business_id=business.id)
+            db.session.add(finance_settings)
             db.session.refresh(business)
 
             # Update current_user.business_id if needed

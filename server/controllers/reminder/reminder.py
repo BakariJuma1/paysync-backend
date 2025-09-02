@@ -10,6 +10,7 @@ from server.utils.reminders import log_reminder
 from server.service.finance_reminders import send_payment_reminder_email
 from datetime import datetime
 from . import reminder_bp
+from server.models import FinanceSettings
 
 api = Api(reminder_bp)  
 
@@ -27,7 +28,10 @@ class SendSingleReminder(Resource):
         business = Business.query.get_or_404(debt.business_id)
         settings = getattr(business, "finance_settings", None)
         if not settings:
-            return {"message": "Finance settings missing"}, 400
+            settings = FinanceSettings(business_id=business.id)
+            db.session.add(settings)
+            db.session.commit()
+            
 
         reminder_type = "before_due" if (debt.due_date and debt.due_date >= datetime.utcnow()) else "after_due"
 
