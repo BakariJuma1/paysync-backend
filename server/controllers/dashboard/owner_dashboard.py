@@ -68,18 +68,20 @@ class OwnerDashboard(Resource):
                 date_filters.append(Debt.created_at >= start_date_obj)
 
         # SUMMARY
-        total_debts = Debt.query.join(Customer).filter(
+        total_debts = Debt.query.select_from(Debt).join(Customer, Debt.customer_id == Customer.id).filter(
             Customer.business_id.in_(business_ids),
             *date_filters
         ).count()
         
         total_amount = db.session.query(func.sum(Debt.total))\
-            .join(Customer)\
+            .select_from(Debt)\
+            .join(Customer, Debt.customer_id == Customer.id)\
             .filter(Customer.business_id.in_(business_ids), *date_filters)\
             .scalar() or 0
         
         total_paid = db.session.query(func.sum(Debt.amount_paid))\
-            .join(Customer)\
+            .select_from(Debt)\
+            .join(Customer, Debt.customer_id == Customer.id)\
             .filter(Customer.business_id.in_(business_ids), *date_filters)\
             .scalar() or 0
         
@@ -89,7 +91,8 @@ class OwnerDashboard(Resource):
         # STATUS BREAKDOWN (for pie chart)
         status_breakdown = dict(
             db.session.query(Debt.status, func.count(Debt.id))
-            .join(Customer)
+            .select_from(Debt)
+            .join(Customer, Debt.customer_id == Customer.id)
             .filter(Customer.business_id.in_(business_ids), *date_filters)
             .group_by(Debt.status)
             .all()
@@ -103,7 +106,8 @@ class OwnerDashboard(Resource):
                 func.sum(Debt.balance).label("total_balance"),
                 Debt.status
             )
-            .join(Debt)
+            .select_from(Debt)
+            .join(Customer, Debt.customer_id == Customer.id)
             .filter(Customer.business_id.in_(business_ids), *date_filters, Debt.balance > 0)
             .group_by(Customer.id, Customer.customer_name, Customer.phone, Debt.status)
             .order_by(func.sum(Debt.balance).desc())
@@ -128,7 +132,8 @@ class OwnerDashboard(Resource):
                 Debt.due_date,
                 Debt.balance
             )
-            .join(Debt)
+            .select_from(Debt)
+            .join(Customer, Debt.customer_id == Customer.id)
             .filter(
                 Customer.business_id.in_(business_ids),
                 *date_filters,
@@ -212,7 +217,7 @@ class OwnerDashboard(Resource):
         ]
 
         # OVERDUE DEBTS
-        overdue_query = Debt.query.join(Customer).filter(
+        overdue_query = Debt.query.select_from(Debt).join(Customer, Debt.customer_id == Customer.id).filter(
             Customer.business_id.in_(business_ids),
             *date_filters,
             Debt.balance > 0,
