@@ -91,8 +91,7 @@ class PaymentResource(Resource):
 
         db.session.add(payment)
 
-        # Update debt status
-        debt.amount_paid += payment.amount
+        
         debt.update_status()
 
         db.session.commit()
@@ -110,9 +109,7 @@ class PaymentResource(Resource):
         if not can_access_payment(current_user, payment):
             return {"message": "Access denied"}, 403
 
-        # Reverse effect on debt before delete
         if payment.debt:
-            payment.debt.amount_paid -= payment.amount
             payment.debt.update_status()
 
         log_change("Payment", payment.id, "delete", payment_schema.dump(payment))
@@ -144,8 +141,6 @@ class PaymentResource(Resource):
             new_amount = data["amount"]
 
             if payment.debt:
-                payment.debt.amount_paid -= old_amount
-                payment.debt.amount_paid += new_amount
                 payment.debt.update_status()
 
             payment.amount = new_amount
