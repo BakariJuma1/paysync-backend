@@ -30,7 +30,7 @@ class SendSingleReminder(Resource):
         if not settings:
             settings = FinanceSettings(business_id=business.id)
             db.session.add(settings)
-            db.session.commit()
+           
             
 
         reminder_type = "before_due" if (debt.due_date and debt.due_date >= datetime.utcnow()) else "after_due"
