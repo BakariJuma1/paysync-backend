@@ -9,7 +9,7 @@ class Business(db.Model):
     name = db.Column(db.String(255), nullable=False)
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     address = db.Column(db.String(255), nullable=True)    
-    phone = db.Column(db.String(50), nullable=True)
+    phone = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(255), nullable=True)
     website = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
