@@ -35,8 +35,12 @@ class SendSingleReminder(Resource):
 
         reminder_type = "before_due" if (debt.due_date and debt.due_date >= datetime.utcnow()) else "after_due"
 
-        # Build details quickly (reusing logic)
+      
+        debt.calculate_total()
+        debt.update_status()
+        db.session.add(debt)
         balance = float(debt.balance)
+        
         details = {
             "debt_id": debt.id,
             "invoice_number": f"INV-{debt.id:05d}",
@@ -49,7 +53,7 @@ class SendSingleReminder(Resource):
                     "name": item.name,
                     "quantity": item.quantity,
                     "unit_price": f"{item.price:.2f}",
-                    "total_price": f"{item.total:.2f}",
+                    "total_price": f"{item.total_price:.2f}",
                  }
                  for item in debt.items  
             ],
@@ -73,6 +77,7 @@ class SendSingleReminder(Resource):
             debt.reminder_count = (debt.reminder_count or 0) + 1
             db.session.add(debt)
             log_reminder(debt, "email", "manual", "sent", actor_user_id=user_id)
+            
             db.session.commit()
             return {"message": f"Reminder sent to {debt.customer.customer_name}"}, 200
         else:
