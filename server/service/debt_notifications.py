@@ -1,25 +1,19 @@
-# server/service/debt_notifications.py
 import logging
 from datetime import datetime
-from io import BytesIO
 from server.utils.pdf_utils import generate_debt_pdf
-from server.service.finance_reminders import send_payment_reminder_email  
+from server.utils.email_templates import subject_for_debt, debt_email_html
+from server.service.notifications.email_sender import send_email, make_pdf_attachment
+from server.service.notifications.sms_sender import send_sms 
+import os 
 
 logger = logging.getLogger(__name__)
 
-def send_debt_receipt(debt, send_email=True, send_sms=False):
-
+def _build_debt_details(debt):
     customer = debt.customer
-    business = customer.business
-
-    if not customer:
-        logger.warning(f"Debt {debt.id} has no customer linked")
-        return False
-
-    # Build details dictionary for PDF
-    details = {
-        "customer_name": customer.customer_name,
-        "business_name": business.name,
+    business = customer.business if customer else None
+    return {
+        "customer_name": customer.customer_name if customer else "N/A",
+        "business_name": business.name if business else "N/A",
         "invoice_number": f"INV-{debt.id:05d}",
         "created_at": debt.created_at.strftime("%Y-%m-%d") if debt.created_at else None,
         "due_date": debt.due_date.strftime("%Y-%m-%d") if debt.due_date else None,
@@ -39,27 +33,44 @@ def send_debt_receipt(debt, send_email=True, send_sms=False):
         "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-    # Generate PDF buffer
-    pdf_buffer = generate_debt_pdf(details)
+def send_debt_notification(debt, kind: str = "receipt", via_email: bool = True, via_sms: bool = False) -> bool:
+   
+    customer = debt.customer
+    if not customer:
+        logger.warning(f"Debt {debt.id} has no customer linked")
+        return False
 
-    # Send email
-    if send_email and customer.email:
+    business = customer.business
+    details = _build_debt_details(debt)
+
+    # Build email components
+    subject = subject_for_debt(business.name, details, kind)  
+    html = debt_email_html(business.name, customer.customer_name, details, kind)  
+
+    # PDF
+    pdf_buffer = generate_debt_pdf(details)  
+    attachment = make_pdf_attachment(
+        filename=f"Invoice-{details.get('invoice_number','N/A')}.pdf",
+        pdf_buffer=pdf_buffer,
+    )
+
+    # Email channel
+    if via_email and customer.email:
         try:
-            send_payment_reminder_email(
-                customer_email=customer.email,
-                customer_name=customer.customer_name,
-                business_name=business.name,
-                debt_details=details,
-                reminder_type="receipt", 
-                pdf_attachment=pdf_buffer  
+            send_email(
+                to=customer.email,
+                subject=subject,
+                html=html,
+                attachments=[attachment],
+                sender=os.getenv("MAIL_DEFAULT_SENDER", f"{business.name} <no-reply@{business.name.lower().replace(' ', '')}.com>")
             )
-            logger.info(f"Debt receipt sent to {customer.email}")
+            logger.info(f"Debt {debt.id}: email sent to {customer.email} [{kind}]")
         except Exception as e:
-            logger.error(f"Failed to send debt receipt for Debt {debt.id}: {e}")
+            logger.error(f"Debt {debt.id}: failed to send email [{kind}] -> {e}")
 
-    # Send SMS (placeholder)
-    if send_sms and customer.phone:
-        # sms logic
-        logger.info(f"Debt receipt SMS would be sent to {customer.phone}")
+    #
+    if via_sms and customer.phone:
+        # future  implimentation 
+        logger.info(f"[SMS placeholder] Debt {debt.id}: would send SMS to {customer.phone} [{kind}]")
 
     return True

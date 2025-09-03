@@ -4,9 +4,9 @@ from flask_jwt_extended import get_jwt_identity
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER
 from server.models import db, Debt, User, Business, FinanceSettings
-from server.tasks.finance_reminders import process_business_reminders
+
 from server.utils.reminders import log_reminder
-from server.service.finance_reminders import send_payment_reminder_email
+from server.service.debt_notifications import  send_debt_notification
 from datetime import datetime
 from . import reminder_bp
 from server.utils.pdf_utils import generate_debt_pdf 
@@ -71,16 +71,19 @@ class SendSingleReminder(Resource):
             response.headers['Content-Disposition'] = f'attachment; filename=reminder_{debt.id}.pdf'
             return response
 
-        # Determine reminder type
+        
         reminder_type = "before_due" if (debt.due_date and debt.due_date >= datetime.utcnow()) else "after_due"
         if reminder_type == "before_due":
             details["days_until_due"] = (debt.due_date - datetime.utcnow()).days if debt.due_date else None
         else:
             details["days_overdue"] = (datetime.utcnow() - debt.due_date).days if debt.due_date else None
 
-        # Send email reminder
-        ok = send_payment_reminder_email(
-            debt.customer.email, debt.customer.customer_name, business.name, details, reminder_type
+        # Send notifications  reminder
+        ok = send_debt_notification(
+            debt,
+            kind=reminder_type,
+            send_email=True,
+            send_sms=False
         )
         if ok:
             debt.last_reminder_sent = datetime.utcnow()
@@ -95,16 +98,52 @@ class SendSingleReminder(Resource):
             return {"message": "Failed to send reminder"}, 502
 
 
-# Owner clicks 'Run reminders now' for their business only
+# business owner  send bulk reminders for debts in their business
 class RunOwnerBulkReminders(Resource):
     @role_required(ROLE_OWNER)
     def post(self):
         user_id = get_jwt_identity()
         owner = User.query.get_or_404(user_id)
         business = Business.query.get_or_404(owner.business_id)
-        process_business_reminders(business, actor_user_id=user_id)
+
+        # Fetch all active debts for this business
+        debts = Debt.query.filter_by(business_id=business.id).all()
+        sent_count, failed_count = 0, 0
+
+        for debt in debts:
+            if debt.balance <= 0:
+                continue
+
+          
+            if debt.due_date and debt.due_date >= datetime.utcnow():
+                reminder_type = "before_due"
+            else:
+                reminder_type = "after_due"
+
+            ok = send_debt_notification(
+                debt,
+                kind=reminder_type,
+                send_email=True,
+                send_sms=False
+            )
+
+            if ok:
+                debt.last_reminder_sent = datetime.utcnow()
+                debt.reminder_count = (debt.reminder_count or 0) + 1
+                db.session.add(debt)
+                log_reminder(debt, "email", "bulk", "sent", actor_user_id=user_id)
+                sent_count += 1
+            else:
+                log_reminder(debt, "email", "bulk", "failed", actor_user_id=user_id)
+                failed_count += 1
+
         db.session.commit()
-        return {"message": "Reminder job executed for your business"}, 200
+
+        return {
+            "message": f"Bulk reminder job executed",
+            "sent": sent_count,
+            "failed": failed_count
+        }, 200
 
 
 api.add_resource(SendSingleReminder, "/reminders/debts/<int:debt_id>")
