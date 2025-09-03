@@ -35,7 +35,7 @@ class SendSingleReminder(Resource):
 
         reminder_type = "before_due" if (debt.due_date and debt.due_date >= datetime.utcnow()) else "after_due"
 
-      
+    #    recheck first 
         debt.calculate_total()
         debt.update_status()
         db.session.add(debt)
