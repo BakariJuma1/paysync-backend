@@ -21,7 +21,7 @@ class OwnerSignup(Resource):
         user = User(
             name=data['name'],
             email=data['email'],
-            role='owner',
+            role='user',
             is_verified=False
         )
         user.set_password(data['password'])
@@ -36,7 +36,15 @@ class OwnerSignup(Resource):
         otp_code = totp.now()
        
         send_verification_email(user,otp_code)
-        return {"message": "Owner registered! Please verify your email."}, 201
+        return {
+            "message": "Owner registered! Please verify your email.",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "role": user.role
+            }
+        }, 201
 
 api.add_resource(OwnerSignup, '/register')
 

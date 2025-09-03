@@ -7,6 +7,7 @@ from . import auth_bp
 from server.service.email_service import send_verification_email
 from flask_jwt_extended import create_access_token
 import pyotp
+from server.utils.roles import ROLE_OWNER
 
 api = Api(auth_bp)
 
@@ -30,12 +31,13 @@ class VerifyEmail(Resource):
             return {"message": "Verification secret not found. Please request a new code."}, 400
 
         totp = pyotp.TOTP(user.verification_secret,interval=250)
-        if not totp.verify(otp, valid_window=3):  # allow 30s before/after window
+        if not totp.verify(otp, valid_window=3):  
             return {"message": "Invalid or expired OTP code."}, 400
 
         # Mark user as verified and clear secret (optional)
         user.is_verified = True
         user.verification_secret = None
+        user.role = ROLE_OWNER
         db.session.commit()
 
         access_token = create_access_token(identity=user.id)
