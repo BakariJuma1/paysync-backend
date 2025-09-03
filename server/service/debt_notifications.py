@@ -7,6 +7,8 @@ from server.service.notifications.sms_sender import send_sms
 import os 
 
 logger = logging.getLogger(__name__)
+# centralized debt notifications 
+
 
 def _build_debt_details(debt):
     customer = debt.customer
@@ -46,8 +48,7 @@ def send_debt_notification(debt, kind: str = "receipt", via_email: bool = True, 
     # Build email components
     subject = subject_for_debt(business.name, details, kind)  
     html = debt_email_html(business.name, customer.customer_name, details, kind)  
-
-    # PDF
+    
     pdf_buffer = generate_debt_pdf(details)  
     attachment = make_pdf_attachment(
         filename=f"Invoice-{details.get('invoice_number','N/A')}.pdf",
@@ -68,7 +69,7 @@ def send_debt_notification(debt, kind: str = "receipt", via_email: bool = True, 
         except Exception as e:
             logger.error(f"Debt {debt.id}: failed to send email [{kind}] -> {e}")
 
-    #
+    
     if via_sms and customer.phone:
         # future  implimentation 
         logger.info(f"[SMS placeholder] Debt {debt.id}: would send SMS to {customer.phone} [{kind}]")

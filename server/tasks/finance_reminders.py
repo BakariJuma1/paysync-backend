@@ -1,15 +1,17 @@
-from datetime import datetime, timedelta
 import logging
+from datetime import datetime, timedelta
 from sqlalchemy import and_
 from server.extension import db
 from server.models import Debt, Customer, Business, FinanceSettings
-from server.service.finance_reminders import send_payment_reminder_email
+from server.service.debt_notifications import send_debt_notification
 from server.utils.reminders import should_send_today_qexpr, log_reminder
 
 logger = logging.getLogger(__name__)
 
+
 def process_payment_reminders():
     """Run for ALL businesses on schedule."""
+    from server import create_app  
     app = create_app()
     with app.app_context():
         try:
@@ -20,6 +22,7 @@ def process_payment_reminders():
         except Exception as e:
             logger.error(f"Error processing payment reminders: {e}", exc_info=True)
             db.session.rollback()
+
 
 def process_business_reminders(business, actor_user_id=None):
     """Run for ONE business (used by scheduler or manual bulk trigger)."""
@@ -33,6 +36,7 @@ def process_business_reminders(business, actor_user_id=None):
     if getattr(settings, "reminder_after_due", False):
         _process_after_due(business, settings, actor_user_id)
 
+
 def _process_before_due(business, settings, actor_user_id=None):
     """Payments due within N days (before due)."""
     now = datetime.utcnow()
@@ -45,29 +49,22 @@ def _process_before_due(business, settings, actor_user_id=None):
             Debt.status.in_(["unpaid", "partial"]),
             Debt.due_date.isnot(None),
             Debt.due_date.between(now, window_end),
-            should_send_today_qexpr(now)              # cooldown
+            should_send_today_qexpr(now)   # cooldown
         )
         .all()
     )
 
     for debt in debts:
-        cust = debt.customer
-        if not getattr(cust, "email", None):
+        if not debt.customer or not debt.customer.email:
             continue
 
-        days_until_due = (debt.due_date - now).days
-        debt_details = {
-            "debt_id": debt.id,
-            "invoice_number": f"INV-{debt.id:05d}",
-            "due_date": debt.due_date.strftime("%Y-%m-%d"),
-            "amount_due": f"{float(debt.balance):.2f} {settings.default_currency}",
-            "status": debt.status,
-            "days_until_due": days_until_due,
-        }
-
-        ok = send_payment_reminder_email(
-            cust.email, cust.customer_name, business.name, debt_details, "before_due"
+        ok = send_debt_notification(
+            debt,
+            kind="before_due",
+            via_email=True,
+            via_sms=False
         )
+
         if ok:
             debt.last_reminder_sent = now
             debt.reminder_count = (debt.reminder_count or 0) + 1
@@ -75,6 +72,7 @@ def _process_before_due(business, settings, actor_user_id=None):
             log_reminder(debt, "email", "before_due", "sent", actor_user_id)
         else:
             log_reminder(debt, "email", "before_due", "failed", actor_user_id)
+
 
 def _process_after_due(business, settings, actor_user_id=None):
     """Overdue payments within N days back (after due)."""
@@ -89,19 +87,17 @@ def _process_after_due(business, settings, actor_user_id=None):
             Debt.due_date.isnot(None),
             Debt.due_date <= now,
             Debt.due_date >= window_start,
-            should_send_today_qexpr(now)              # cooldown
+            should_send_today_qexpr(now)   # cooldown
         )
         .all()
     )
 
     for debt in debts:
-        cust = debt.customer
-        if not getattr(cust, "email", None):
+        if not debt.customer or not debt.customer.email:
             continue
 
+      
         days_overdue = (now - debt.due_date).days
-
-        # Late fee calculation
         late_fee_amount = 0
         if settings.late_fee_type != "none" and days_overdue > settings.grace_period_days:
             if settings.late_fee_type == "percentage":
@@ -111,19 +107,15 @@ def _process_after_due(business, settings, actor_user_id=None):
             else:
                 late_fee_amount = settings.late_fee_value
 
-        debt_details = {
-            "debt_id": debt.id,
-            "invoice_number": f"INV-{debt.id:05d}",
-            "due_date": debt.due_date.strftime("%Y-%m-%d"),
-            "amount_due": f"{float(debt.balance):.2f} {settings.default_currency}",
-            "status": debt.status,
-            "days_overdue": days_overdue,
-            "late_fee_amount": f"{late_fee_amount:.2f} {settings.default_currency}" if late_fee_amount else "None",
-        }
+        debt.late_fee_amount = late_fee_amount
 
-        ok = send_payment_reminder_email(
-            cust.email, cust.customer_name, business.name, debt_details, "after_due"
+        ok = send_debt_notification(
+            debt,
+            kind="after_due",
+            via_email=True,
+            via_sms=False
         )
+
         if ok:
             debt.last_reminder_sent = now
             debt.reminder_count = (debt.reminder_count or 0) + 1
