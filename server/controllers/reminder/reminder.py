@@ -1,6 +1,5 @@
-# server/routes/reminders.py
 from flask_restful import Resource, Api
-from flask import request, render_template, make_response
+from flask import request, make_response
 from flask_jwt_extended import get_jwt_identity
 from server.utils.decorators import role_required
 from server.utils.roles import ROLE_OWNER
@@ -9,8 +8,8 @@ from server.tasks.finance_reminders import process_business_reminders
 from server.utils.reminders import log_reminder
 from server.service.finance_reminders import send_payment_reminder_email
 from datetime import datetime
-from weasyprint import HTML
 from . import reminder_bp
+from server.utils.pdf_utils import generate_debt_pdf 
 
 api = Api(reminder_bp)
 
@@ -42,6 +41,8 @@ class SendSingleReminder(Resource):
         details = {
             "debt_id": debt.id,
             "invoice_number": f"INV-{debt.id:05d}",
+            "customer_name": debt.customer.customer_name,
+            "business_name": business.name,
             "created_at": debt.created_at.strftime("%Y-%m-%d") if debt.created_at else None,
             "due_date": debt.due_date.strftime("%Y-%m-%d") if debt.due_date else None,
             "amount_due": f"{balance:.2f} {settings.default_currency}",
@@ -64,20 +65,8 @@ class SendSingleReminder(Resource):
 
         # Handle optional PDF download
         if request.args.get("download", "false").lower() == "true":
-            html = render_template(
-                "reminder.html",
-                customer_name=debt.customer.customer_name,
-                business_name=business.name,
-                invoice_number=details["invoice_number"],
-                due_date=details["due_date"],
-                status=details["status"],
-                items=details["items"],
-                total=details["total"],
-                amount_paid=details["amount_paid"],
-                balance=details["balance"],
-            )
-            pdf = HTML(string=html).write_pdf()
-            response = make_response(pdf)
+            pdf_buffer = generate_debt_pdf(details)
+            response = make_response(pdf_buffer.getvalue())
             response.headers['Content-Type'] = 'application/pdf'
             response.headers['Content-Disposition'] = f'attachment; filename=reminder_{debt.id}.pdf'
             return response

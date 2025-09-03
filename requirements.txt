@@ -61,3 +61,4 @@ zipp==3.20.2
 requests==2.31.0
 resend==0.6.0
 APScheduler 
+reportlab>=4.0
