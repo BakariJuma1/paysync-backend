@@ -45,7 +45,7 @@ def send_debt_notification(debt, kind: str = "receipt", via_email: bool = True, 
     business = customer.business
     details = _build_debt_details(debt)
 
-    # Build email components
+    # email components
     subject = subject_for_debt(business.name, details, kind)  
     html = debt_email_html(business.name, customer.customer_name, details, kind)  
     

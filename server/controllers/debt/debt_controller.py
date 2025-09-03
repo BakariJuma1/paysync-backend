@@ -156,7 +156,7 @@ class DebtResource(Resource):
             )
             db.session.add(payment)
         db.session.commit()
-        send_debt_notification(debt, send_email=True, send_sms=False)
+        send_debt_notification(debt, kind="receipt", via_email=True, via_sms=False)
 
         debt_with_customer = Debt.query.options(
             joinedload(Debt.customer),
