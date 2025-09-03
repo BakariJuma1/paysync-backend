@@ -98,6 +98,7 @@ class SalesmanDashboard(Resource):
         achievement_percent = (total_paid / target_amount * 100) if target_amount > 0 else 0
 
         return {
+          
             "summary": {
                 "total_debts": total_debts,
                 "total_amount": float(total_amount),

@@ -40,9 +40,25 @@ class SendSingleReminder(Resource):
         details = {
             "debt_id": debt.id,
             "invoice_number": f"INV-{debt.id:05d}",
+            "created_at": debt.created_at.strftime("%Y-%m-%d") if debt.created_at else None,
             "due_date": debt.due_date.strftime("%Y-%m-%d") if debt.due_date else None,
             "amount_due": f"{balance:.2f} {settings.default_currency}",
             "status": debt.status,
+            "items": [
+                {
+                    "name": item.name,
+                    "quantity": item.quantity,
+                    "unit_price": f"{item.price:.2f}",
+                    "total_price": f"{item.total:.2f}",
+                 }
+                 for item in debt.items  
+            ],
+            "total": f"{debt.total:.2f}",
+            "amount_paid": f"{debt.amount_paid:.2f}",
+            "balance": f"{debt.balance:.2f}",
+            "late_fee_amount": f"{debt.late_fee_amount:.2f}" if hasattr(debt,   'late_fee_amount') else "0.00",
+            "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
         }
         if reminder_type == "before_due":
             details["days_until_due"] = (debt.due_date - datetime.utcnow()).days if debt.due_date else None

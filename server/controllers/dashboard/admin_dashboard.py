@@ -97,6 +97,9 @@ class ManagerDashboard(Resource):
         ]
 
         return {
+            "business":{
+                "name": business.name
+            },
             "summary": {
                 "total_debts": total_debts,
                 "total_amount": float(total_amount),

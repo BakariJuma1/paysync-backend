@@ -235,6 +235,9 @@ class OwnerDashboard(Resource):
         ]
 
         return {
+            "business":{
+                 "name":businesses[0].name
+            },
             "summary": {
                 "total_debts": total_debts,
                 "total_amount": float(total_amount),
