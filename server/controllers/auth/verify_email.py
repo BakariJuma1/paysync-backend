@@ -40,7 +40,10 @@ class VerifyEmail(Resource):
         user.role = ROLE_OWNER
         db.session.commit()
 
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(
+            identity=user.id,
+            additional_claims={"role": user.role}
+            )
 
         has_business = Business.query.filter_by(owner_id=user.id).first() is not None
 
