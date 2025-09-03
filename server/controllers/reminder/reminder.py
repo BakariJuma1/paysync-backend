@@ -81,9 +81,8 @@ class SendSingleReminder(Resource):
         # Send notifications  reminder
         ok = send_debt_notification(
             debt,
-            kind=reminder_type,
-            send_email=True,
-            send_sms=False
+            via_email=True,
+            via_sms=False,
         )
         if ok:
             debt.last_reminder_sent = datetime.utcnow()
@@ -123,8 +122,8 @@ class RunOwnerBulkReminders(Resource):
             ok = send_debt_notification(
                 debt,
                 kind=reminder_type,
-                send_email=True,
-                send_sms=False
+                via_email=True,
+                via_sms=False,
             )
 
             if ok:
