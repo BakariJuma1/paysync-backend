@@ -72,36 +72,49 @@ class BusinessResource(Resource):
         errors = business_create_update_schema.validate(json_data)
         if errors:
             return {"errors": errors}, 400
+        
+        business = Business.query.filter_by(owner_id=current_user.id).first()
+        if business:
+            # Update existing business instead of creating a new one
+            updatable_fields = ["name", "address", "phone", "email", "website", "description"]
+            for field in updatable_fields:
+                if field in json_data:
+                    setattr(business, field, json_data[field])
+            try:
+                db.session.commit()
+                return {"business": business_schema.dump(business), "message": "Business updated successfully"}, 200
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                return {"message": "Database error", "details": str(e)}, 422
+        else:
+            try:
+                business = Business(
+                    name=json_data['name'].strip(),
+                    owner_id=current_user.id,
+                    address=json_data.get('address'),
+                    phone=json_data.get('phone'),
+                    email=json_data.get('email'),
+                    website=json_data.get('website'),
+                    description=json_data.get('description')
+                )
+                db.session.add(business)
+                db.session.flush()
+                finance_settings = FinanceSettings(business_id=business.id)
+                db.session.add(finance_settings)
+                db.session.refresh(business)
 
-        try:
-            business = Business(
-                name=json_data['name'].strip(),
-                owner_id=current_user.id,
-                address=json_data.get('address'),
-                phone=json_data.get('phone'),
-                email=json_data.get('email'),
-                website=json_data.get('website'),
-                description=json_data.get('description')
-            )
-            db.session.add(business)
-            db.session.flush()
-            
-            finance_settings = FinanceSettings(business_id=business.id)
-            db.session.add(finance_settings)
-            db.session.refresh(business)
+                # Update current_user.business_id if needed
+                current_user.business_id = business.id
+                db.session.commit()
 
-            # Update current_user.business_id if needed
-            current_user.business_id = business.id
-            db.session.commit()
+                return {
+                    "business": business_schema.dump(business),
+                    "message": "Business created successfully"
+                }, 201
 
-            return {
-                "business": business_schema.dump(business),
-                "message": "Business created successfully"
-            }, 201
-
-        except SQLAlchemyError as e:
-            db.session.rollback()
-            return {"message": "Database error", "details": str(e)}, 422
+            except SQLAlchemyError as e:
+                db.session.rollback()
+                return {"message": "Database error", "details": str(e)}, 422
 
     @jwt_required()
     @role_required(ROLE_OWNER)
