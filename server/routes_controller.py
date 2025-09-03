@@ -10,6 +10,7 @@ from server.controllers.changelog import changelog_bp
 from server.controllers.customer import customer_bp
 from server.controllers.payment import payment_bp
 from server.controllers.reminder import reminder_bp
+from server.controllers.export import export_bp
 
 def register_routes(app):
     app.register_blueprint(auth_bp)
@@ -24,3 +25,4 @@ def register_routes(app):
     app.register_blueprint(customer_bp)
     app.register_blueprint(payment_bp)
     app.register_blueprint(reminder_bp)
+    app.register_blueprint(export_bp)

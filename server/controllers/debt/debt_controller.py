@@ -9,6 +9,7 @@ from server.utils.change_logger import log_change
 from server.utils.roles import ROLE_OWNER, ROLE_ADMIN, ROLE_SALESPERSON
 from server.utils.decorators import role_required
 from sqlalchemy.orm import joinedload
+from server.service.debt_notifications import send_debt_receipt
 
 api = Api(debt_bp)
 
@@ -155,6 +156,7 @@ class DebtResource(Resource):
             )
             db.session.add(payment)
         db.session.commit()
+        send_debt_receipt(debt, send_email=True, send_sms=False)
 
         debt_with_customer = Debt.query.options(
             joinedload(Debt.customer),
@@ -269,6 +271,7 @@ class DebtResource(Resource):
         log_change("Debt", debt.id, "delete", debt_schema.dump(debt))
         db.session.delete(debt)
         db.session.commit()
+        send_debt_receipt(debt, send_email=True, send_sms=False)
         return {"message": f"Debt {debt_id} deleted"}, 200
 
 
