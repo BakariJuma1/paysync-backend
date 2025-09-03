@@ -14,7 +14,7 @@ def send_payment_reminder_email(customer_email, customer_name, business_name, de
     """
     Send a payment reminder email to a customer using Resend
     """
-    sender = os.getenv("MAIL_DEFAULT_SENDER", f"{business_name} <no-reply@isaac-juma.site>")
+    sender = os.getenv("MAIL_DEFAULT_SENDER", f"{business_name} <no-reply@isaac-  juma.site>")
 
     if reminder_type == "before_due":
         subject = f"Upcoming Payment Due: {business_name}"

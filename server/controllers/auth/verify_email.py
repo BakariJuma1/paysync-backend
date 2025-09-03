@@ -30,7 +30,7 @@ class VerifyEmail(Resource):
             return {"message": "Verification secret not found. Please request a new code."}, 400
 
         totp = pyotp.TOTP(user.verification_secret,interval=250)
-        if not totp.verify(otp, valid_window=1):  # allow 30s before/after window
+        if not totp.verify(otp, valid_window=3):  # allow 30s before/after window
             return {"message": "Invalid or expired OTP code."}, 400
 
         # Mark user as verified and clear secret (optional)
