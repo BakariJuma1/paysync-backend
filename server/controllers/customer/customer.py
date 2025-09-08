@@ -60,11 +60,11 @@ class CustomerResource(Resource):
                 db.session.query(Debt.customer_id)
                 .filter_by(created_by=current_user.id)
                 .distinct()
-        )
-        customers = Customer.query.filter(
-            Customer.id.in_(customer_ids),
-            Customer.business_id == current_user.business_id
-        ).all()
+            )
+            customers = Customer.query.filter(
+                Customer.id.in_(customer_ids),
+                Customer.business_id == current_user.business_id
+            ).all()
 
         customers_with_debts = []
         for customer in customers:
