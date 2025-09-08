@@ -70,7 +70,18 @@ class CustomerResource(Resource):
                 Customer.business_id == current_user.business_id
             ).all()
 
-        return {"customers": customers_schema.dump(customers)}, 200
+            customers_with_debts = []
+            for customer in customers:
+                debts=Debt.query.filter_by(customer_id=customer.id).all()
+                debts_data = debts_schema.dump(debts)
+                customers_with_debts.append(
+                    {
+                        "customer": customer_schema.dump(customer),
+                        "debts": debts_data
+                    }
+                )
+
+        return {"customers": customers_with_debts}, 200
 
     @jwt_required()
     @role_required(ROLE_OWNER, ROLE_ADMIN)
