@@ -46,16 +46,20 @@ class CustomerResource(Resource):
             debts_data = debts_schema.dump(debts)
 
             return {
-                "customer": customer_schema.dump(customer),
+                "customer": customer_schema.dump(customer), 
                 "debts": debts_data
             }, 200
+        print("Current user ID:", current_user.id)
+        print("Current user role:", current_user.role)
+        print("Current user business_id:", current_user.business_id)
 
-    # List customers
+
+        # List customers
         if current_user.role in [ROLE_OWNER, ROLE_ADMIN]:
             customers = Customer.query.filter_by(
                 business_id=current_user.business_id
             ).all()
-        else:  
+        else:  # Salesperson
             customer_ids = (
                 db.session.query(Debt.customer_id)
                 .filter_by(created_by=current_user.id)
@@ -66,17 +70,7 @@ class CustomerResource(Resource):
                 Customer.business_id == current_user.business_id
             ).all()
 
-        customers_with_debts = []
-        for customer in customers:
-            debts = Debt.query.filter_by(customer_id=customer.id).all()
-            debts_data = debts_schema.dump(debts)
-            customers_with_debts.append({
-                "customer": customer_schema.dump(customer),
-                "debts": debts_data
-        })
-
-        return {"customers": customers_with_debts}, 200
-
+        return {"customers": customers_schema.dump(customers)}, 200
 
     @jwt_required()
     @role_required(ROLE_OWNER, ROLE_ADMIN)
