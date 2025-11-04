@@ -2,9 +2,9 @@ services:
   - type: web
     name: paysync-backend
     env: python
-    rootDir: paysync-backend/server
+    rootDir: paysync-backend
     buildCommand: pip install -r requirements.txt
-    startCommand: flask db upgrade && gunicorn wsgi:app
+    startCommand: python run_migrations.py && gunicorn wsgi:app
     plan: free
     envVars:
       - fromGroup: paysync-env
