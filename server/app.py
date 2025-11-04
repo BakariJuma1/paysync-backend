@@ -70,7 +70,11 @@ def create_app():
     
     @app.route('/')
     def home():
-        return {"message": "Welcome to paysync API"}
+        return {
+        "message": "PaySync backend is running ",
+        "status": "OK",
+        "version": "1.0.0"
+        }
     
     # Add JWT error handlers
     @jwt.invalid_token_loader
